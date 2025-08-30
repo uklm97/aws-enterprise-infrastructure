@@ -1,0 +1,1054 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS Landing Zone - Main Template for Organizations, SSO, and Core Infrastructure",
+  
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "aws-landing-zone",
+      "Description": "Project name for resource naming"
+    },
+    "Environment": {
+      "Type": "String",
+      "Default": "landing-zone",
+      "Description": "Environment name"
+    },
+    "AdminEmail": {
+      "Type": "String",
+      "Default": "admin@example.com",
+      "Description": "Admin email for notifications and SSO"
+    },
+    "OrganizationName": {
+      "Type": "String",
+      "Default": "My Organization",
+      "Description": "Organization name"
+    },
+    "EnableGuardDuty": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable AWS GuardDuty"
+    },
+    "EnableSecurityHub": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable AWS Security Hub"
+    },
+    "EnableMacie": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable AWS Macie"
+    },
+    "EnableConfigRules": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable AWS Config rules"
+    },
+    "BudgetAmount": {
+      "Type": "String",
+      "Default": "1000",
+      "Description": "Monthly budget amount in USD"
+    },
+    "BudgetThreshold": {
+      "Type": "Number",
+      "Default": 80,
+      "Description": "Budget threshold percentage for alerts"
+    },
+    "LogRetentionDays": {
+      "Type": "Number",
+      "Default": 30,
+      "Description": "Number of days to retain logs"
+    },
+    "SSOSessionDuration": {
+      "Type": "Number",
+      "Default": 8,
+      "Description": "SSO session duration in hours"
+    },
+    "EnableMultiRegionTrail": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable multi-region CloudTrail"
+    },
+    "EnableGlobalServiceEvents": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable global service events in CloudTrail"
+    },
+    "EnableS3DataEvents": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable S3 data events in CloudTrail"
+    },
+    "EnableCloudWatchLogs": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable CloudWatch logs for CloudTrail"
+    },
+    "EnableSNSNotifications": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable SNS notifications"
+    },
+    "EnableBudgetAlerts": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable budget alerts"
+    }
+  },
+
+  "Mappings": {
+    "OrganizationalUnits": {
+      "Security": {
+        "Name": "Security",
+        "Description": "Security and compliance accounts"
+      },
+      "Infrastructure": {
+        "Name": "Infrastructure",
+        "Description": "Shared services and networking accounts"
+      },
+      "Workloads": {
+        "Name": "Workloads",
+        "Description": "Application and workload accounts"
+      },
+      "Sandbox": {
+        "Name": "Sandbox",
+        "Description": "Development and testing accounts"
+      }
+    },
+    "PermissionSets": {
+      "Administrator": {
+        "Name": "Administrator",
+        "Description": "Full administrator access",
+        "Policy": "arn:aws:iam::aws:policy/AdministratorAccess",
+        "SessionDuration": "PT8H"
+      },
+      "Developer": {
+        "Name": "Developer",
+        "Description": "Developer access with limited permissions",
+        "Policy": "arn:aws:iam::aws:policy/PowerUserAccess",
+        "SessionDuration": "PT8H"
+      },
+      "ReadOnly": {
+        "Name": "ReadOnly",
+        "Description": "Read-only access",
+        "Policy": "arn:aws:iam::aws:policy/ReadOnlyAccess",
+        "SessionDuration": "PT8H"
+      }
+    }
+  },
+
+  "Resources": {
+    "AWSOrganizationsOrganization": {
+      "Type": "AWS::Organizations::Organization",
+      "Properties": {
+        "FeatureSet": "ALL",
+        "AwsServiceAccessPrincipals": [
+          "cloudtrail.amazonaws.com",
+          "config.amazonaws.com",
+          "sso.amazonaws.com",
+          "securityhub.amazonaws.com",
+          "guardduty.amazonaws.com",
+          "macie.amazonaws.com",
+          "config-multiaccountsetup.amazonaws.com"
+        ],
+        "EnabledPolicyTypes": [
+          "SERVICE_CONTROL_POLICY",
+          "TAG_POLICY"
+        ]
+      }
+    },
+
+    "SecurityOU": {
+      "Type": "AWS::Organizations::OrganizationalUnit",
+      "Properties": {
+        "Name": {
+          "Fn::FindInMap": ["OrganizationalUnits", "Security", "Name"]
+        },
+        "ParentId": {
+          "Fn::GetAtt": ["AWSOrganizationsOrganization", "Roots"]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-security-ou"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "security"
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          }
+        ]
+      }
+    },
+
+    "InfrastructureOU": {
+      "Type": "AWS::Organizations::OrganizationalUnit",
+      "Properties": {
+        "Name": {
+          "Fn::FindInMap": ["OrganizationalUnits", "Infrastructure", "Name"]
+        },
+        "ParentId": {
+          "Fn::GetAtt": ["AWSOrganizationsOrganization", "Roots"]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-infrastructure-ou"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "infrastructure"
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          }
+        ]
+      }
+    },
+
+    "WorkloadsOU": {
+      "Type": "AWS::Organizations::OrganizationalUnit",
+      "Properties": {
+        "Name": {
+          "Fn::FindInMap": ["OrganizationalUnits", "Workloads", "Name"]
+        },
+        "ParentId": {
+          "Fn::GetAtt": ["AWSOrganizationsOrganization", "Roots"]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-workloads-ou"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "workloads"
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          }
+        ]
+      }
+    },
+
+    "SandboxOU": {
+      "Type": "AWS::Organizations::OrganizationalUnit",
+      "Properties": {
+        "Name": {
+          "Fn::FindInMap": ["OrganizationalUnits", "Sandbox", "Name"]
+        },
+        "ParentId": {
+          "Fn::GetAtt": ["AWSOrganizationsOrganization", "Roots"]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-sandbox-ou"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "sandbox"
+          },
+          {
+            "Key": "Environment",
+            "Value": {
+              "Ref": "Environment"
+            }
+          },
+          {
+            "Key": "Project",
+            "Value": {
+              "Ref": "ProjectName"
+            }
+          }
+        ]
+      }
+    },
+
+    "SSOInstance": {
+      "Type": "AWS::SSO::Instance",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-sso"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-sso-instance"
+            }
+          }
+        ]
+      }
+    },
+
+    "AdministratorPermissionSet": {
+      "Type": "AWS::SSO::PermissionSet",
+      "Properties": {
+        "Name": {
+          "Fn::FindInMap": ["PermissionSets", "Administrator", "Name"]
+        },
+        "Description": {
+          "Fn::FindInMap": ["PermissionSets", "Administrator", "Description"]
+        },
+        "InstanceArn": {
+          "Ref": "SSOInstance"
+        },
+        "SessionDuration": {
+          "Fn::FindInMap": ["PermissionSets", "Administrator", "SessionDuration"]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Administrator-PermissionSet"
+          }
+        ]
+      }
+    },
+
+    "DeveloperPermissionSet": {
+      "Type": "AWS::SSO::PermissionSet",
+      "Properties": {
+        "Name": {
+          "Fn::FindInMap": ["PermissionSets", "Developer", "Name"]
+        },
+        "Description": {
+          "Fn::FindInMap": ["PermissionSets", "Developer", "Description"]
+        },
+        "InstanceArn": {
+          "Ref": "SSOInstance"
+        },
+        "SessionDuration": {
+          "Fn::FindInMap": ["PermissionSets", "Developer", "SessionDuration"]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "Developer-PermissionSet"
+          }
+        ]
+      }
+    },
+
+    "ReadOnlyPermissionSet": {
+      "Type": "AWS::SSO::PermissionSet",
+      "Properties": {
+        "Name": {
+          "Fn::FindInMap": ["PermissionSets", "ReadOnly", "Name"]
+        },
+        "Description": {
+          "Fn::FindInMap": ["PermissionSets", "ReadOnly", "Description"]
+        },
+        "InstanceArn": {
+          "Ref": "SSOInstance"
+        },
+        "SessionDuration": {
+          "Fn::FindInMap": ["PermissionSets", "ReadOnly", "SessionDuration"]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "ReadOnly-PermissionSet"
+          }
+        ]
+      }
+    },
+
+    "AdministratorPolicyAttachment": {
+      "Type": "AWS::SSO::ManagedPolicyAttachment",
+      "Properties": {
+        "InstanceArn": {
+          "Ref": "SSOInstance"
+        },
+        "PermissionSetArn": {
+          "Ref": "AdministratorPermissionSet"
+        },
+        "ManagedPolicyArn": {
+          "Fn::FindInMap": ["PermissionSets", "Administrator", "Policy"]
+        }
+      }
+    },
+
+    "DeveloperPolicyAttachment": {
+      "Type": "AWS::SSO::ManagedPolicyAttachment",
+      "Properties": {
+        "InstanceArn": {
+          "Ref": "SSOInstance"
+        },
+        "PermissionSetArn": {
+          "Ref": "DeveloperPermissionSet"
+        },
+        "ManagedPolicyArn": {
+          "Fn::FindInMap": ["PermissionSets", "Developer", "Policy"]
+        }
+      }
+    },
+
+    "ReadOnlyPolicyAttachment": {
+      "Type": "AWS::SSO::ManagedPolicyAttachment",
+      "Properties": {
+        "InstanceArn": {
+          "Ref": "SSOInstance"
+        },
+        "PermissionSetArn": {
+          "Ref": "ReadOnlyPermissionSet"
+        },
+        "ManagedPolicyArn": {
+          "Fn::FindInMap": ["PermissionSets", "ReadOnly", "Policy"]
+        }
+      }
+    },
+
+    "ConfigBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${ProjectName}-config-${AWS::AccountId}"
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-config-bucket"
+            }
+          }
+        ]
+      }
+    },
+
+    "CloudTrailBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${ProjectName}-cloudtrail-${AWS::AccountId}"
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-cloudtrail-bucket"
+            }
+          }
+        ]
+      }
+    },
+
+    "ConfigRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "${ProjectName}-config-role"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "config.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/ConfigRole"
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-config-role"
+            }
+          }
+        ]
+      }
+    },
+
+    "ConfigRecorder": {
+      "Type": "AWS::Config::ConfigurationRecorder",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-config-recorder"
+        },
+        "RoleARN": {
+          "Fn::GetAtt": ["ConfigRole", "Arn"]
+        },
+        "RecordingGroup": {
+          "AllSupported": true,
+          "IncludeGlobalResources": true
+        }
+      }
+    },
+
+    "ConfigDeliveryChannel": {
+      "Type": "AWS::Config::DeliveryChannel",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-config-delivery"
+        },
+        "S3BucketName": {
+          "Ref": "ConfigBucket"
+        },
+        "S3KeyPrefix": "config"
+      },
+      "DependsOn": ["ConfigRecorder"]
+    },
+
+    "ConfigRecorderStatus": {
+      "Type": "AWS::Config::ConfigurationRecorderStatus",
+      "Properties": {
+        "Name": {
+          "Ref": "ConfigRecorder"
+        },
+        "Recording": true
+      },
+      "DependsOn": ["ConfigDeliveryChannel"]
+    },
+
+    "CloudTrail": {
+      "Type": "AWS::CloudTrail::Trail",
+      "Properties": {
+        "TrailName": {
+          "Fn::Sub": "${ProjectName}-cloudtrail"
+        },
+        "S3BucketName": {
+          "Ref": "CloudTrailBucket"
+        },
+        "IncludeGlobalServiceEvents": {
+          "Fn::If": ["EnableGlobalServiceEvents", true, false]
+        },
+        "IsMultiRegionTrail": {
+          "Fn::If": ["EnableMultiRegionTrail", true, false]
+        },
+        "EnableLogFileValidation": true,
+        "EventSelectors": [
+          {
+            "ReadWriteType": "All",
+            "IncludeManagementEvents": true,
+            "DataResources": [
+              {
+                "Type": "AWS::S3::Object",
+                "Values": ["arn:aws:s3:::"]
+              }
+            ]
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-cloudtrail"
+            }
+          }
+        ]
+      }
+    },
+
+    "ConfigLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/config/${ProjectName}"
+        },
+        "RetentionInDays": {
+          "Ref": "LogRetentionDays"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-config-logs"
+            }
+          }
+        ]
+      }
+    },
+
+    "CloudTrailLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/cloudtrail/${ProjectName}"
+        },
+        "RetentionInDays": {
+          "Ref": "LogRetentionDays"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-cloudtrail-logs"
+            }
+          }
+        ]
+      }
+    },
+
+    "ExecutiveDashboard": {
+      "Type": "AWS::CloudWatch::Dashboard",
+      "Properties": {
+        "DashboardName": {
+          "Fn::Sub": "${ProjectName}-executive-dashboard"
+        },
+        "DashboardBody": {
+          "Fn::Sub": |
+            {
+              "widgets": [
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 0,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      ["AWS/Organizations", "AccountCount"]
+                    ],
+                    "period": 300,
+                    "stat": "Average",
+                    "region": "${AWS::Region}",
+                    "title": "Total Accounts"
+                  }
+                },
+                {
+                  "type": "metric",
+                  "x": 12,
+                  "y": 0,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      ["AWS/CloudTrail", "CallCount"]
+                    ],
+                    "period": 300,
+                    "stat": "Sum",
+                    "region": "${AWS::Region}",
+                    "title": "API Calls"
+                  }
+                }
+              ]
+            }
+        }
+      }
+    },
+
+    "SecurityDashboard": {
+      "Type": "AWS::CloudWatch::Dashboard",
+      "Properties": {
+        "DashboardName": {
+          "Fn::Sub": "${ProjectName}-security-dashboard"
+        },
+        "DashboardBody": {
+          "Fn::Sub": |
+            {
+              "widgets": [
+                {
+                  "type": "metric",
+                  "x": 0,
+                  "y": 0,
+                  "width": 12,
+                  "height": 6,
+                  "properties": {
+                    "metrics": [
+                      ["AWS/Config", "ConfigRuleEvaluations"]
+                    ],
+                    "period": 300,
+                    "stat": "Sum",
+                    "region": "${AWS::Region}",
+                    "title": "Config Rule Evaluations"
+                  }
+                }
+              ]
+            }
+        }
+      }
+    },
+
+    "LandingZoneAlertsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": {
+          "Fn::Sub": "${ProjectName}-landing-zone-alerts"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-landing-zone-alerts"
+            }
+          }
+        ]
+      }
+    },
+
+    "SecurityAlertsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": {
+          "Fn::Sub": "${ProjectName}-security-alerts"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-security-alerts"
+            }
+          }
+        ]
+      }
+    },
+
+    "ComplianceAlertsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": {
+          "Fn::Sub": "${ProjectName}-compliance-alerts"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-compliance-alerts"
+            }
+          }
+        ]
+      }
+    },
+
+    "MonthlyBudget": {
+      "Type": "AWS::Budgets::Budget",
+      "Properties": {
+        "BudgetName": {
+          "Fn::Sub": "${ProjectName}-monthly-budget"
+        },
+        "BudgetLimit": {
+          "Amount": {
+            "Ref": "BudgetAmount"
+          },
+          "Unit": "USD"
+        },
+        "TimeUnit": "MONTHLY",
+        "BudgetType": "COST",
+        "CostFilters": {},
+        "NotificationsWithSubscribers": [
+          {
+            "Notification": {
+              "ComparisonOperator": "GREATER_THAN",
+              "NotificationType": "ACTUAL",
+              "Threshold": {
+                "Ref": "BudgetThreshold"
+              },
+              "ThresholdType": "PERCENTAGE"
+            },
+            "Subscribers": [
+              {
+                "Address": {
+                  "Ref": "AdminEmail"
+                },
+                "SubscriptionType": "EMAIL"
+              }
+            ]
+          }
+        ]
+      }
+    },
+
+    "DenyRootUserPolicy": {
+      "Type": "AWS::Organizations::Policy",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-deny-root-user"
+        },
+        "Type": "SERVICE_CONTROL_POLICY",
+        "Content": {
+          "Fn::Sub": |
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Deny",
+                  "Action": "*",
+                  "Resource": "*",
+                  "Condition": {
+                    "StringEquals": {
+                      "aws:PrincipalType": "Root"
+                    }
+                  }
+                }
+              ]
+            }
+        }
+      }
+    },
+
+    "RequireMFAPolicy": {
+      "Type": "AWS::Organizations::Policy",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-require-mfa"
+        },
+        "Type": "SERVICE_CONTROL_POLICY",
+        "Content": {
+          "Fn::Sub": |
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Deny",
+                  "Action": "*",
+                  "Resource": "*",
+                  "Condition": {
+                    "BoolIfExists": {
+                      "aws:MultiFactorAuthPresent": "false"
+                    }
+                  }
+                }
+              ]
+            }
+        }
+      }
+    }
+  },
+
+  "Conditions": {
+    "EnableGlobalServiceEvents": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableGlobalServiceEvents"
+        },
+        "true"
+      ]
+    },
+    "EnableMultiRegionTrail": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableMultiRegionTrail"
+        },
+        "true"
+      ]
+    },
+    "EnableSNSNotifications": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableSNSNotifications"
+        },
+        "true"
+      ]
+    },
+    "EnableBudgetAlerts": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableBudgetAlerts"
+        },
+        "true"
+      ]
+    }
+  },
+
+  "Outputs": {
+    "OrganizationId": {
+      "Description": "AWS Organization ID",
+      "Value": {
+        "Ref": "AWSOrganizationsOrganization"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-OrganizationId"
+        }
+      }
+    },
+    "SSOInstanceArn": {
+      "Description": "AWS SSO Instance ARN",
+      "Value": {
+        "Ref": "SSOInstance"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-SSOInstanceArn"
+        }
+      }
+    },
+    "SecurityOUId": {
+      "Description": "Security OU ID",
+      "Value": {
+        "Ref": "SecurityOU"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-SecurityOUId"
+        }
+      }
+    },
+    "InfrastructureOUId": {
+      "Description": "Infrastructure OU ID",
+      "Value": {
+        "Ref": "InfrastructureOU"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-InfrastructureOUId"
+        }
+      }
+    },
+    "WorkloadsOUId": {
+      "Description": "Workloads OU ID",
+      "Value": {
+        "Ref": "WorkloadsOU"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-WorkloadsOUId"
+        }
+      }
+    },
+    "SandboxOUId": {
+      "Description": "Sandbox OU ID",
+      "Value": {
+        "Ref": "SandboxOU"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-SandboxOUId"
+        }
+      }
+    },
+    "ConfigBucketName": {
+      "Description": "Config S3 Bucket Name",
+      "Value": {
+        "Ref": "ConfigBucket"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ConfigBucketName"
+        }
+      }
+    },
+    "CloudTrailBucketName": {
+      "Description": "CloudTrail S3 Bucket Name",
+      "Value": {
+        "Ref": "CloudTrailBucket"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-CloudTrailBucketName"
+        }
+      }
+    },
+    "LandingZoneAlertsTopicArn": {
+      "Description": "Landing Zone Alerts SNS Topic ARN",
+      "Value": {
+        "Ref": "LandingZoneAlertsTopic"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-LandingZoneAlertsTopicArn"
+        }
+      }
+    },
+    "SecurityAlertsTopicArn": {
+      "Description": "Security Alerts SNS Topic ARN",
+      "Value": {
+        "Ref": "SecurityAlertsTopic"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-SecurityAlertsTopicArn"
+        }
+      }
+    },
+    "ComplianceAlertsTopicArn": {
+      "Description": "Compliance Alerts SNS Topic ARN",
+      "Value": {
+        "Ref": "ComplianceAlertsTopic"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ComplianceAlertsTopicArn"
+        }
+      }
+    }
+  }
+}
