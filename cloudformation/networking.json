@@ -1,0 +1,659 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Networking components for Multi-VPC Environment - Subnets, Route Tables, NAT Gateways, and VPC Peering",
+  
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "multi-vpc",
+      "Description": "Environment name for resource tagging"
+    },
+    "ProjectName": {
+      "Type": "String",
+      "Default": "multi-vpc-demo",
+      "Description": "Project name for resource tagging"
+    },
+    "EnableNATGateway": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable NAT Gateway for private subnets"
+    }
+  },
+
+  "Mappings": {
+    "VPCConfig": {
+      "Production": {
+        "CIDR": "10.0.0.0/16",
+        "PublicSubnets": ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"],
+        "PrivateSubnets": ["10.0.11.0/24", "10.0.12.0/24", "10.0.13.0/24"],
+        "DatabaseSubnets": ["10.0.21.0/24", "10.0.22.0/24", "10.0.23.0/24"]
+      },
+      "Development": {
+        "CIDR": "10.1.0.0/16",
+        "PublicSubnets": ["10.1.1.0/24", "10.1.2.0/24", "10.1.3.0/24"],
+        "PrivateSubnets": ["10.1.11.0/24", "10.1.12.0/24", "10.1.13.0/24"],
+        "DatabaseSubnets": ["10.1.21.0/24", "10.1.22.0/24", "10.1.23.0/24"]
+      },
+      "DMZ": {
+        "CIDR": "10.2.0.0/16",
+        "PublicSubnets": ["10.2.1.0/24", "10.2.2.0/24", "10.2.3.0/24"],
+        "PrivateSubnets": ["10.2.11.0/24", "10.2.12.0/24", "10.2.13.0/24"]
+      },
+      "SharedServices": {
+        "CIDR": "10.3.0.0/16",
+        "PublicSubnets": ["10.3.1.0/24", "10.3.2.0/24", "10.3.3.0/24"],
+        "PrivateSubnets": ["10.3.11.0/24", "10.3.12.0/24", "10.3.13.0/24"],
+        "DatabaseSubnets": ["10.3.21.0/24", "10.3.22.0/24", "10.3.23.0/24"]
+      }
+    }
+  },
+
+  "Resources": {
+    "ProductionPublicSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "PublicSubnets", 0]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["0", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-public-1"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "public"
+          }
+        ]
+      }
+    },
+
+    "ProductionPublicSubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "PublicSubnets", 1]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["1", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-public-2"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "public"
+          }
+        ]
+      }
+    },
+
+    "ProductionPublicSubnet3": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "PublicSubnets", 2]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["2", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "MapPublicIpOnLaunch": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-public-3"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "public"
+          }
+        ]
+      }
+    },
+
+    "ProductionPrivateSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "PrivateSubnets", 0]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["0", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-private-1"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "private"
+          }
+        ]
+      }
+    },
+
+    "ProductionPrivateSubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "PrivateSubnets", 1]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["1", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-private-2"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "private"
+          }
+        ]
+      }
+    },
+
+    "ProductionPrivateSubnet3": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "PrivateSubnets", 2]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["2", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-private-3"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "private"
+          }
+        ]
+      }
+    },
+
+    "ProductionDatabaseSubnet1": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "DatabaseSubnets", 0]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["0", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-database-1"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "database"
+          }
+        ]
+      }
+    },
+
+    "ProductionDatabaseSubnet2": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "DatabaseSubnets", 1]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["1", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-database-2"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "database"
+          }
+        ]
+      }
+    },
+
+    "ProductionDatabaseSubnet3": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "CidrBlock": {
+          "Fn::FindInMap": ["VPCConfig", "Production", "DatabaseSubnets", 2]
+        },
+        "AvailabilityZone": {
+          "Fn::Select": ["2", {
+            "Fn::GetAZs": {
+              "Ref": "AWS::Region"
+            }
+          }]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-database-3"
+            }
+          },
+          {
+            "Key": "Type",
+            "Value": "database"
+          }
+        ]
+      }
+    },
+
+    "ProductionPublicRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-public-rt"
+            }
+          }
+        ]
+      }
+    },
+
+    "ProductionPublicRoute": {
+      "Type": "AWS::EC2::Route",
+      "DependsOn": "ProductionIGWAttachment",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "ProductionPublicRouteTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "GatewayId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionIGW"
+          }
+        }
+      }
+    },
+
+    "ProductionPrivateRouteTable": {
+      "Type": "AWS::EC2::RouteTable",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-private-rt"
+            }
+          }
+        ]
+      }
+    },
+
+    "ProductionNATGateway": {
+      "Type": "AWS::EC2::NatGateway",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "AllocationId": {
+          "Fn::GetAtt": ["ProductionEIP", "AllocationId"]
+        },
+        "SubnetId": {
+          "Ref": "ProductionPublicSubnet1"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-nat"
+            }
+          }
+        ]
+      }
+    },
+
+    "ProductionEIP": {
+      "Type": "AWS::EC2::EIP",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "Domain": "vpc",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-nat-eip"
+            }
+          }
+        ]
+      }
+    },
+
+    "ProductionPrivateRoute": {
+      "Type": "AWS::EC2::Route",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "RouteTableId": {
+          "Ref": "ProductionPrivateRouteTable"
+        },
+        "DestinationCidrBlock": "0.0.0.0/0",
+        "NatGatewayId": {
+          "Ref": "ProductionNATGateway"
+        }
+      }
+    },
+
+    "ProductionPublicSubnet1RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionPublicSubnet1"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPublicRouteTable"
+        }
+      }
+    },
+
+    "ProductionPublicSubnet2RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionPublicSubnet2"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPublicRouteTable"
+        }
+      }
+    },
+
+    "ProductionPublicSubnet3RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionPublicSubnet3"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPublicRouteTable"
+        }
+      }
+    },
+
+    "ProductionPrivateSubnet1RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionPrivateSubnet1"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPrivateRouteTable"
+        }
+      }
+    },
+
+    "ProductionPrivateSubnet2RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionPrivateSubnet2"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPrivateRouteTable"
+        }
+      }
+    },
+
+    "ProductionPrivateSubnet3RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionPrivateSubnet3"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPrivateRouteTable"
+        }
+      }
+    },
+
+    "ProductionDatabaseSubnet1RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionDatabaseSubnet1"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPrivateRouteTable"
+        }
+      }
+    },
+
+    "ProductionDatabaseSubnet2RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionDatabaseSubnet2"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPrivateRouteTable"
+        }
+      }
+    },
+
+    "ProductionDatabaseSubnet3RouteTableAssociation": {
+      "Type": "AWS::EC2::SubnetRouteTableAssociation",
+      "Condition": "NATGatewayEnabled",
+      "Properties": {
+        "SubnetId": {
+          "Ref": "ProductionDatabaseSubnet3"
+        },
+        "RouteTableId": {
+          "Ref": "ProductionPrivateRouteTable"
+        }
+      }
+    }
+  },
+
+  "Conditions": {
+    "NATGatewayEnabled": {
+      "Fn::Equals": [
+        {
+          "Ref": "EnableNATGateway"
+        },
+        "true"
+      ]
+    }
+  },
+
+  "Outputs": {
+    "ProductionPublicSubnets": {
+      "Description": "Production Public Subnet IDs",
+      "Value": {
+        "Fn::Join": [
+          ",",
+          [
+            {
+              "Ref": "ProductionPublicSubnet1"
+            },
+            {
+              "Ref": "ProductionPublicSubnet2"
+            },
+            {
+              "Ref": "ProductionPublicSubnet3"
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ProductionPublicSubnets"
+        }
+      }
+    },
+    "ProductionPrivateSubnets": {
+      "Description": "Production Private Subnet IDs",
+      "Value": {
+        "Fn::Join": [
+          ",",
+          [
+            {
+              "Ref": "ProductionPrivateSubnet1"
+            },
+            {
+              "Ref": "ProductionPrivateSubnet2"
+            },
+            {
+              "Ref": "ProductionPrivateSubnet3"
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ProductionPrivateSubnets"
+        }
+      }
+    },
+    "ProductionDatabaseSubnets": {
+      "Description": "Production Database Subnet IDs",
+      "Value": {
+        "Fn::Join": [
+          ",",
+          [
+            {
+              "Ref": "ProductionDatabaseSubnet1"
+            },
+            {
+              "Ref": "ProductionDatabaseSubnet2"
+            },
+            {
+              "Ref": "ProductionDatabaseSubnet3"
+            }
+          ]
+        ]
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ProductionDatabaseSubnets"
+        }
+      }
+    }
+  }
+}

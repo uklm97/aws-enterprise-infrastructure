@@ -1,0 +1,628 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "Security components for Multi-VPC Environment - Security Groups and Network ACLs",
+  
+  "Parameters": {
+    "Environment": {
+      "Type": "String",
+      "Default": "multi-vpc",
+      "Description": "Environment name for resource tagging"
+    },
+    "ProjectName": {
+      "Type": "String",
+      "Default": "multi-vpc-demo",
+      "Description": "Project name for resource tagging"
+    }
+  },
+
+  "Resources": {
+    "ProductionWebSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-production-web-sg"
+        },
+        "GroupDescription": "Security group for production web servers",
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "SourceSecurityGroupId": {
+              "Ref": "ProductionALBSecurityGroup"
+            },
+            "Description": "HTTP from ALB"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "SourceSecurityGroupId": {
+              "Ref": "ProductionALBSecurityGroup"
+            },
+            "Description": "HTTPS from ALB"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "SourceSecurityGroupId": {
+              "Ref": "BastionSecurityGroup"
+            },
+            "Description": "SSH from bastion"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-web-sg"
+            }
+          }
+        ]
+      }
+    },
+
+    "ProductionALBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-production-alb-sg"
+        },
+        "GroupDescription": "Security group for production ALB",
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "HTTP from internet"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "HTTPS from internet"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-alb-sg"
+            }
+          }
+        ]
+      }
+    },
+
+    "ProductionDBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-production-db-sg"
+        },
+        "GroupDescription": "Security group for production database",
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 3306,
+            "ToPort": 3306,
+            "SourceSecurityGroupId": {
+              "Ref": "ProductionWebSecurityGroup"
+            },
+            "Description": "MySQL from web servers"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-db-sg"
+            }
+          }
+        ]
+      }
+    },
+
+    "DevelopmentWebSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-development-web-sg"
+        },
+        "GroupDescription": "Security group for development web servers",
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-DevelopmentVPC"
+          }
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "SourceSecurityGroupId": {
+              "Ref": "DevelopmentALBSecurityGroup"
+            },
+            "Description": "HTTP from ALB"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "SourceSecurityGroupId": {
+              "Ref": "DevelopmentALBSecurityGroup"
+            },
+            "Description": "HTTPS from ALB"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "SourceSecurityGroupId": {
+              "Ref": "BastionSecurityGroup"
+            },
+            "Description": "SSH from bastion"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-development-web-sg"
+            }
+          }
+        ]
+      }
+    },
+
+    "DevelopmentALBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-development-alb-sg"
+        },
+        "GroupDescription": "Security group for development ALB",
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-DevelopmentVPC"
+          }
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 80,
+            "ToPort": 80,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "HTTP from internet"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "HTTPS from internet"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-development-alb-sg"
+            }
+          }
+        ]
+      }
+    },
+
+    "DevelopmentDBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-development-db-sg"
+        },
+        "GroupDescription": "Security group for development database",
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-DevelopmentVPC"
+          }
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 3306,
+            "ToPort": 3306,
+            "SourceSecurityGroupId": {
+              "Ref": "DevelopmentWebSecurityGroup"
+            },
+            "Description": "MySQL from web servers"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-development-db-sg"
+            }
+          }
+        ]
+      }
+    },
+
+    "SharedDBSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-shared-db-sg"
+        },
+        "GroupDescription": "Security group for shared database",
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-SharedServicesVPC"
+          }
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 3306,
+            "ToPort": 3306,
+            "SourceSecurityGroupId": {
+              "Ref": "ProductionWebSecurityGroup"
+            },
+            "Description": "MySQL from production"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 3306,
+            "ToPort": 3306,
+            "SourceSecurityGroupId": {
+              "Ref": "DevelopmentWebSecurityGroup"
+            },
+            "Description": "MySQL from development"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-shared-db-sg"
+            }
+          }
+        ]
+      }
+    },
+
+    "BastionSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-bastion-sg"
+        },
+        "GroupDescription": "Security group for bastion host",
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-DMZVPC"
+          }
+        },
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 22,
+            "ToPort": 22,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "SSH from internet"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-bastion-sg"
+            }
+          }
+        ]
+      }
+    },
+
+    "ProductionNetworkACL": {
+      "Type": "AWS::EC2::NetworkAcl",
+      "Properties": {
+        "VpcId": {
+          "Fn::ImportValue": {
+            "Fn::Sub": "${AWS::StackName}-ProductionVPC"
+          }
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-production-nacl"
+            }
+          }
+        ]
+      }
+    },
+
+    "ProductionNetworkACLIngressRule1": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "ProductionNetworkACL"
+        },
+        "RuleNumber": 100,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": false,
+        "CidrBlock": "0.0.0.0/0",
+        "PortRange": {
+          "From": 80,
+          "To": 80
+        }
+      }
+    },
+
+    "ProductionNetworkACLIngressRule2": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "ProductionNetworkACL"
+        },
+        "RuleNumber": 110,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": false,
+        "CidrBlock": "0.0.0.0/0",
+        "PortRange": {
+          "From": 443,
+          "To": 443
+        }
+      }
+    },
+
+    "ProductionNetworkACLIngressRule3": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "ProductionNetworkACL"
+        },
+        "RuleNumber": 120,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": false,
+        "CidrBlock": "0.0.0.0/0",
+        "PortRange": {
+          "From": 22,
+          "To": 22
+        }
+      }
+    },
+
+    "ProductionNetworkACLIngressRule4": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "ProductionNetworkACL"
+        },
+        "RuleNumber": 130,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": false,
+        "CidrBlock": "0.0.0.0/0",
+        "PortRange": {
+          "From": 1024,
+          "To": 65535
+        }
+      }
+    },
+
+    "ProductionNetworkACLEgressRule1": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "ProductionNetworkACL"
+        },
+        "RuleNumber": 100,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": true,
+        "CidrBlock": "0.0.0.0/0",
+        "PortRange": {
+          "From": 80,
+          "To": 80
+        }
+      }
+    },
+
+    "ProductionNetworkACLEgressRule2": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "ProductionNetworkACL"
+        },
+        "RuleNumber": 110,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": true,
+        "CidrBlock": "0.0.0.0/0",
+        "PortRange": {
+          "From": 443,
+          "To": 443
+        }
+      }
+    },
+
+    "ProductionNetworkACLEgressRule3": {
+      "Type": "AWS::EC2::NetworkAclEntry",
+      "Properties": {
+        "NetworkAclId": {
+          "Ref": "ProductionNetworkACL"
+        },
+        "RuleNumber": 120,
+        "Protocol": 6,
+        "RuleAction": "allow",
+        "Egress": true,
+        "CidrBlock": "0.0.0.0/0",
+        "PortRange": {
+          "From": 1024,
+          "To": 65535
+        }
+      }
+    }
+  },
+
+  "Outputs": {
+    "ProductionWebSecurityGroupId": {
+      "Description": "Production Web Security Group ID",
+      "Value": {
+        "Ref": "ProductionWebSecurityGroup"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ProductionWebSecurityGroup"
+        }
+      }
+    },
+    "ProductionALBSecurityGroupId": {
+      "Description": "Production ALB Security Group ID",
+      "Value": {
+        "Ref": "ProductionALBSecurityGroup"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ProductionALBSecurityGroup"
+        }
+      }
+    },
+    "ProductionDBSecurityGroupId": {
+      "Description": "Production Database Security Group ID",
+      "Value": {
+        "Ref": "ProductionDBSecurityGroup"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ProductionDBSecurityGroup"
+        }
+      }
+    },
+    "DevelopmentWebSecurityGroupId": {
+      "Description": "Development Web Security Group ID",
+      "Value": {
+        "Ref": "DevelopmentWebSecurityGroup"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-DevelopmentWebSecurityGroup"
+        }
+      }
+    },
+    "DevelopmentALBSecurityGroupId": {
+      "Description": "Development ALB Security Group ID",
+      "Value": {
+        "Ref": "DevelopmentALBSecurityGroup"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-DevelopmentALBSecurityGroup"
+        }
+      }
+    },
+    "DevelopmentDBSecurityGroupId": {
+      "Description": "Development Database Security Group ID",
+      "Value": {
+        "Ref": "DevelopmentDBSecurityGroup"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-DevelopmentDBSecurityGroup"
+        }
+      }
+    },
+    "SharedDBSecurityGroupId": {
+      "Description": "Shared Database Security Group ID",
+      "Value": {
+        "Ref": "SharedDBSecurityGroup"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-SharedDBSecurityGroup"
+        }
+      }
+    },
+    "BastionSecurityGroupId": {
+      "Description": "Bastion Security Group ID",
+      "Value": {
+        "Ref": "BastionSecurityGroup"
+      },
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-BastionSecurityGroup"
+        }
+      }
+    }
+  }
+}

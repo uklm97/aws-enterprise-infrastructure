@@ -1,0 +1,269 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Multi-VPC AWS Environment with Production, Development, DMZ, and Shared Services VPCs'
+
+Parameters:
+  Environment:
+    Type: String
+    Default: multi-vpc
+    Description: Environment name for resource tagging
+  
+  ProjectName:
+    Type: String
+    Default: multi-vpc-demo
+    Description: Project name for resource tagging
+  
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    Description: EC2 instance type for web servers
+  
+  DBInstanceClass:
+    Type: String
+    Default: db.t3.micro
+    Description: RDS instance class
+  
+  DBAllocatedStorage:
+    Type: Number
+    Default: 20
+    Description: RDS allocated storage in GB
+  
+  DBEngineVersion:
+    Type: String
+    Default: '8.0.35'
+    Description: MySQL engine version
+  
+  DBUsername:
+    Type: String
+    Default: admin
+    Description: RDS master username
+    NoEcho: true
+  
+  DBPassword:
+    Type: String
+    Default: changeme123!
+    Description: RDS master password
+    NoEcho: true
+  
+  EnableVPCFlowLogs:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Enable VPC Flow Logs
+  
+  EnableNATGateway:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Enable NAT Gateway for private subnets
+
+Mappings:
+  VPCConfig:
+    Production:
+      CIDR: 10.0.0.0/16
+      PublicSubnets: 
+        - 10.0.1.0/24
+        - 10.0.2.0/24
+        - 10.0.3.0/24
+      PrivateSubnets:
+        - 10.0.11.0/24
+        - 10.0.12.0/24
+        - 10.0.13.0/24
+      DatabaseSubnets:
+        - 10.0.21.0/24
+        - 10.0.22.0/24
+        - 10.0.23.0/24
+    Development:
+      CIDR: 10.1.0.0/16
+      PublicSubnets:
+        - 10.1.1.0/24
+        - 10.1.2.0/24
+        - 10.1.3.0/24
+      PrivateSubnets:
+        - 10.1.11.0/24
+        - 10.1.12.0/24
+        - 10.1.13.0/24
+      DatabaseSubnets:
+        - 10.1.21.0/24
+        - 10.1.22.0/24
+        - 10.1.23.0/24
+    DMZ:
+      CIDR: 10.2.0.0/16
+      PublicSubnets:
+        - 10.2.1.0/24
+        - 10.2.2.0/24
+        - 10.2.3.0/24
+      PrivateSubnets:
+        - 10.2.11.0/24
+        - 10.2.12.0/24
+        - 10.2.13.0/24
+    SharedServices:
+      CIDR: 10.3.0.0/16
+      PublicSubnets:
+        - 10.3.1.0/24
+        - 10.3.2.0/24
+        - 10.3.3.0/24
+      PrivateSubnets:
+        - 10.3.11.0/24
+        - 10.3.12.0/24
+        - 10.3.13.0/24
+      DatabaseSubnets:
+        - 10.3.21.0/24
+        - 10.3.22.0/24
+        - 10.3.23.0/24
+
+Resources:
+  # Production VPC
+  ProductionVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [VPCConfig, Production, CIDR]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-production-vpc'
+        - Key: Type
+          Value: production
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Development VPC
+  DevelopmentVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [VPCConfig, Development, CIDR]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-development-vpc'
+        - Key: Type
+          Value: development
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # DMZ VPC
+  DMZVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [VPCConfig, DMZ, CIDR]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-dmz-vpc'
+        - Key: Type
+          Value: dmz
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Shared Services VPC
+  SharedServicesVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !FindInMap [VPCConfig, SharedServices, CIDR]
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-shared-services-vpc'
+        - Key: Type
+          Value: shared_services
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Project
+          Value: !Ref ProjectName
+
+  # Internet Gateways
+  ProductionInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-production-igw'
+
+  DevelopmentInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-development-igw'
+
+  DMZInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-dmz-igw'
+
+  SharedServicesInternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-shared-services-igw'
+
+  # Attach Internet Gateways to VPCs
+  ProductionIGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref ProductionVPC
+      InternetGatewayId: !Ref ProductionInternetGateway
+
+  DevelopmentIGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DevelopmentVPC
+      InternetGatewayId: !Ref DevelopmentInternetGateway
+
+  DMZIGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DMZVPC
+      InternetGatewayId: !Ref DMZInternetGateway
+
+  SharedServicesIGWAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref SharedServicesVPC
+      InternetGatewayId: !Ref SharedServicesInternetGateway
+
+  # Availability Zones
+  AvailabilityZones:
+    Type: AWS::SSM::Parameter::Value::List<AWS::EC2::AvailabilityZone::Name>
+    Default: /aws/service/global-infrastructure/regions/us-west-2/azs
+
+Outputs:
+  ProductionVPCId:
+    Description: Production VPC ID
+    Value: !Ref ProductionVPC
+    Export:
+      Name: !Sub '${AWS::StackName}-ProductionVPC'
+
+  DevelopmentVPCId:
+    Description: Development VPC ID
+    Value: !Ref DevelopmentVPC
+    Export:
+      Name: !Sub '${AWS::StackName}-DevelopmentVPC'
+
+  DMZVPCId:
+    Description: DMZ VPC ID
+    Value: !Ref DMZVPC
+    Export:
+      Name: !Sub '${AWS::StackName}-DMZVPC'
+
+  SharedServicesVPCId:
+    Description: Shared Services VPC ID
+    Value: !Ref SharedServicesVPC
+    Export:
+      Name: !Sub '${AWS::StackName}-SharedServicesVPC'
+
+  AvailabilityZones:
+    Description: Availability Zones used
+    Value: !Join [',', !Ref AvailabilityZones]
