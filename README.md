@@ -1,11 +1,11 @@
-# AWS Infrastructure Projects
+# AWS Enterprise Infrastructure
 
 A comprehensive collection of AWS infrastructure projects providing enterprise-grade solutions for multi-VPC environments, landing zones, and infrastructure auditing. Each project is designed to be independent, well-documented, and production-ready.
 
 ## 📁 Project Structure
 
 ```
-desktop-tutorial/
+aws-enterprise-infrastructure/
 ├── README.md                           # This documentation
 ├── projects/                           # Main projects directory
 │   ├── multi-vpc-aws/                 # Multi-VPC AWS Environment
@@ -147,8 +147,8 @@ A comprehensive AWS infrastructure audit solution that provides security, compli
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/uklm97/desktop-tutorial.git
-cd desktop-tutorial
+git clone https://github.com/uklm97/aws-enterprise-infrastructure.git
+cd aws-enterprise-infrastructure
 ```
 
 ### 2. Choose Your Project
@@ -341,6 +341,11 @@ Each project includes detailed troubleshooting guides in their respective README
 This project is provided as-is for educational and demonstration purposes. Please review and modify according to your specific requirements and security policies.
 
 ## 📝 Changelog
+
+### Version 2.1.0 - Repository Renaming
+- **Renamed** repository to `aws-enterprise-infrastructure`
+- **Updated** all documentation and references
+- **Enhanced** professional branding and naming
 
 ### Version 2.0.0 - Project Restructuring
 - **Restructured** all projects into separate, well-organized directories
