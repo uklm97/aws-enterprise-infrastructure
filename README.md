@@ -21,7 +21,8 @@ aws-enterprise-infrastructure/
 │   ├── aws-edge-iot/                  # AWS Edge Computing & IoT Platform
 │   ├── aws-ml-platform/               # AWS Machine Learning Platform
 │   ├── aws-cost-governance/           # AWS Cost Optimization & Governance
-│   └── aws-performance-scalability/   # AWS Performance & Scalability Framework
+│   ├── aws-performance-scalability/   # AWS Performance & Scalability Framework
+│   └── aws-server-hardening/          # AWS Server Hardening Framework
 ├── CLOUDFORMATION_COMPARISON.md        # Comparison documentation
 └── .gitignore                         # Git ignore file
 ```
@@ -109,6 +110,12 @@ cd projects/aws-cost-governance
 ### 14. AWS Performance & Scalability Framework
 ```bash
 cd projects/aws-performance-scalability
+# See README.md for detailed instructions
+```
+
+### 15. AWS Server Hardening Framework
+```bash
+cd projects/aws-server-hardening
 # See README.md for detailed instructions
 ```
 
@@ -387,6 +394,26 @@ A comprehensive AWS performance and scalability framework that provides high-per
 - AWS Auto Scaling, CloudWatch, EC2
 - AWS Application Load Balancer, RDS
 
+### 🔒 AWS Server Hardening Framework
+**Location:** `projects/aws-server-hardening/`
+
+A comprehensive AWS server hardening framework that provides automated Linux and Windows server hardening with security compliance, monitoring, and best practices.
+
+**Key Features:**
+- ✅ Linux server hardening with CIS benchmarks
+- ✅ Windows server hardening with Group Policy
+- ✅ Security compliance monitoring and reporting
+- ✅ Automated remediation and patching
+- ✅ Security baselines and templates
+- ✅ Infrastructure as Code deployment
+- ✅ Compliance validation and audit trails
+
+**Technologies:**
+- Python (boto3) for hardening automation
+- Terraform for hardening infrastructure
+- AWS Systems Manager, Config, Security Hub
+- CIS Benchmarks, STIG Guidelines, Ansible
+
 ## 🛠️ Technology Stack
 
 ### Infrastructure as Code
@@ -630,6 +657,16 @@ Each project includes detailed troubleshooting guides in their respective README
 This project is provided as-is for educational and demonstration purposes. Please review and modify according to your specific requirements and security policies.
 
 ## 📝 Changelog
+
+### Version 3.1.0 - Server Hardening Framework
+- **Added** AWS Server Hardening Framework - Comprehensive Linux and Windows server hardening
+- **Linux Server Hardening** - CIS benchmarks, security configuration, user management
+- **Windows Server Hardening** - Group Policy, security policies, Windows Defender
+- **Security Compliance** - CIS benchmarks, STIG guidelines, custom security policies
+- **Automated Hardening** - Infrastructure as Code, automated deployment, configuration management
+- **Compliance Monitoring** - Continuous monitoring, security scanning, compliance validation
+- **Remediation Automation** - Automated remediation, patch management, incident response
+- **Security Baselines** - Pre-configured baselines for different environments and compliance standards
 
 ### Version 3.0.0 - Complete Enterprise Infrastructure Suite
 - **Added** 10 new comprehensive AWS projects
