@@ -10,7 +10,8 @@ aws-enterprise-infrastructure/
 ├── projects/                           # Main projects directory
 │   ├── multi-vpc-aws/                 # Multi-VPC AWS Environment
 │   ├── aws-landing-zone/              # AWS Landing Zone with Automation
-│   └── aws-audit-framework/           # AWS Infrastructure Audit Framework
+│   ├── aws-audit-framework/           # AWS Infrastructure Audit Framework
+│   └── aws-operations-automation/     # AWS Operations Automation
 ├── CLOUDFORMATION_COMPARISON.md        # Comparison documentation
 └── .gitignore                         # Git ignore file
 ```
@@ -32,6 +33,12 @@ cd projects/aws-landing-zone
 ### 3. AWS Audit Framework
 ```bash
 cd projects/aws-audit-framework
+# See README.md for detailed instructions
+```
+
+### 4. AWS Operations Automation
+```bash
+cd projects/aws-operations-automation
 # See README.md for detailed instructions
 ```
 
@@ -97,6 +104,27 @@ A comprehensive AWS infrastructure audit solution that provides security, compli
 - Terraform for audit infrastructure
 - AWS Config, CloudWatch, CloudTrail
 - AWS Cost Explorer, Security Hub, GuardDuty
+
+### 🤖 AWS Operations Automation
+**Location:** `projects/aws-operations-automation/`
+
+A comprehensive AWS operations automation solution that provides automated cost savings, maintenance, and operational activities including scheduled start/stop instances, automated snapshots, backup management, and many other operational tasks.
+
+**Key Features:**
+- ✅ Cost Management Automation (scheduled start/stop, spot instances, RI optimization)
+- ✅ Backup & Recovery Automation (automated snapshots, cross-region backup, lifecycle management)
+- ✅ Maintenance Automation (patch management, security updates, health checks)
+- ✅ Resource Management (unused resource cleanup, tag management, rightsizing)
+- ✅ Monitoring & Compliance (automated monitoring, alerting, compliance checks)
+- ✅ Scheduled operations with EventBridge
+- ✅ Lambda-based serverless automation
+- ✅ CloudWatch dashboards and alarms
+
+**Technologies:**
+- Python (boto3) for automation scripts
+- Terraform for automation infrastructure
+- AWS Lambda, EventBridge, CloudWatch
+- AWS SNS, S3, IAM, EC2, EBS
 
 ## 🛠️ Technology Stack
 
