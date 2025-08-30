@@ -1,4 +1,4 @@
-# AWS Cloud Environment Infrastructure Audit
+# AWS Cloud Environment Infrastructure Audit Framework
 
 A comprehensive AWS infrastructure audit solution that provides security, compliance, cost, and performance auditing using both Python (boto3) and Terraform implementations.
 
@@ -43,7 +43,7 @@ AWS Audit Framework
 ## 📁 Project Structure
 
 ```
-aws-audit/
+aws-audit-framework/
 ├── README.md                           # This documentation
 ├── python/                             # Python boto3 implementation
 │   ├── audit_framework.py             # Main audit framework
@@ -92,7 +92,7 @@ aws-audit/
 
 #### Installation
 ```bash
-cd aws-audit/python
+cd projects/aws-audit-framework/python
 pip install -r requirements.txt
 ```
 
@@ -120,7 +120,7 @@ python audit_framework.py --compliance
 
 #### Deploy Audit Framework
 ```bash
-cd aws-audit/terraform
+cd projects/aws-audit-framework/terraform
 terraform init
 terraform plan
 terraform apply
@@ -128,7 +128,7 @@ terraform apply
 
 #### Run Audit
 ```bash
-cd aws-audit/scripts
+cd projects/aws-audit-framework/scripts
 ./run_audit.sh
 ```
 
@@ -278,31 +278,6 @@ class AWSAuditFramework:
         self.run_compliance_audit()
         self.run_infrastructure_audit()
         self.generate_reports()
-    
-    def run_security_audit(self):
-        """Run security audit modules"""
-        security_auditor = SecurityAuditor(self.clients, self.config)
-        self.reports['security'] = security_auditor.run_audit()
-    
-    def run_cost_audit(self):
-        """Run cost audit modules"""
-        cost_auditor = CostAuditor(self.clients, self.config)
-        self.reports['cost'] = cost_auditor.run_audit()
-    
-    def run_performance_audit(self):
-        """Run performance audit modules"""
-        performance_auditor = PerformanceAuditor(self.clients, self.config)
-        self.reports['performance'] = performance_auditor.run_audit()
-    
-    def run_compliance_audit(self):
-        """Run compliance audit modules"""
-        compliance_auditor = ComplianceAuditor(self.clients, self.config)
-        self.reports['compliance'] = compliance_auditor.run_audit()
-    
-    def run_infrastructure_audit(self):
-        """Run infrastructure audit modules"""
-        infrastructure_auditor = InfrastructureAuditor(self.clients, self.config)
-        self.reports['infrastructure'] = infrastructure_auditor.run_audit()
 ```
 
 #### Security Audit Module
@@ -328,91 +303,6 @@ class SecurityAuditor:
             'compliance_checks': self.audit_compliance_checks()
         }
         return audit_results
-    
-    def audit_iam(self):
-        """Audit IAM users, roles, and policies"""
-        results = {
-            'users': self.analyze_iam_users(),
-            'roles': self.analyze_iam_roles(),
-            'policies': self.analyze_iam_policies(),
-            'access_keys': self.analyze_access_keys(),
-            'mfa_status': self.analyze_mfa_status()
-        }
-        return results
-    
-    def analyze_iam_users(self):
-        """Analyze IAM users for security issues"""
-        users = self.iam_client.list_users()
-        user_analysis = []
-        
-        for user in users['Users']:
-            user_info = {
-                'username': user['UserName'],
-                'arn': user['Arn'],
-                'create_date': user['CreateDate'],
-                'password_last_used': user.get('PasswordLastUsed'),
-                'mfa_enabled': self.check_mfa_enabled(user['UserName']),
-                'access_keys': self.get_user_access_keys(user['UserName']),
-                'attached_policies': self.get_attached_policies(user['UserName']),
-                'inline_policies': self.get_inline_policies(user['UserName'])
-            }
-            user_analysis.append(user_info)
-        
-        return user_analysis
-```
-
-#### Cost Audit Module
-```python
-# cost_audit.py
-class CostAuditor:
-    def __init__(self, clients, config):
-        self.clients = clients
-        self.config = config
-        self.ce_client = clients['ce']
-        self.ec2_client = clients['ec2']
-        self.rds_client = clients['rds']
-        self.s3_client = clients['s3']
-        self.lambda_client = clients['lambda']
-    
-    def run_audit(self):
-        """Run comprehensive cost audit"""
-        audit_results = {
-            'resource_utilization': self.audit_resource_utilization(),
-            'cost_optimization': self.audit_cost_optimization(),
-            'budget_analysis': self.audit_budget_analysis(),
-            'unused_resources': self.identify_unused_resources()
-        }
-        return audit_results
-    
-    def audit_resource_utilization(self):
-        """Audit resource utilization for cost optimization"""
-        results = {
-            'ec2_instances': self.analyze_ec2_utilization(),
-            'ebs_volumes': self.analyze_ebs_utilization(),
-            'rds_instances': self.analyze_rds_utilization(),
-            's3_storage': self.analyze_s3_utilization(),
-            'lambda_functions': self.analyze_lambda_utilization()
-        }
-        return results
-    
-    def analyze_ec2_utilization(self):
-        """Analyze EC2 instance utilization"""
-        instances = self.ec2_client.describe_instances()
-        utilization_analysis = []
-        
-        for reservation in instances['Reservations']:
-            for instance in reservation['Instances']:
-                instance_info = {
-                    'instance_id': instance['InstanceId'],
-                    'instance_type': instance['InstanceType'],
-                    'state': instance['State']['Name'],
-                    'launch_time': instance['LaunchTime'],
-                    'utilization_metrics': self.get_instance_metrics(instance['InstanceId']),
-                    'cost_optimization': self.get_cost_optimization_suggestions(instance)
-                }
-                utilization_analysis.append(instance_info)
-        
-        return utilization_analysis
 ```
 
 ### Terraform Implementation
@@ -455,42 +345,6 @@ module "security_audit" {
   enable_vpc_audit         = var.enable_vpc_audit
   enable_encryption_audit  = var.enable_encryption_audit
 }
-
-# Cost Audit Module
-module "cost_audit" {
-  source = "./modules/cost_audit"
-  
-  project_name = var.project_name
-  environment  = var.environment
-  
-  enable_cost_analysis     = var.enable_cost_analysis
-  enable_budget_alerts     = var.enable_budget_alerts
-  enable_utilization_audit = var.enable_utilization_audit
-}
-
-# Performance Audit Module
-module "performance_audit" {
-  source = "./modules/performance_audit"
-  
-  project_name = var.project_name
-  environment  = var.environment
-  
-  enable_performance_monitoring = var.enable_performance_monitoring
-  enable_cloudwatch_dashboards  = var.enable_cloudwatch_dashboards
-  enable_alerts                 = var.enable_alerts
-}
-
-# Compliance Audit Module
-module "compliance_audit" {
-  source = "./modules/compliance_audit"
-  
-  project_name = var.project_name
-  environment  = var.environment
-  
-  enable_config_rules     = var.enable_config_rules
-  enable_cis_benchmarks   = var.enable_cis_benchmarks
-  enable_compliance_alerts = var.enable_compliance_alerts
-}
 ```
 
 #### Security Audit Module
@@ -514,13 +368,6 @@ resource "aws_config_delivery_channel" "security_audit" {
   depends_on = [aws_config_configuration_recorder.security_audit]
 }
 
-resource "aws_config_configuration_recorder_status" "security_audit" {
-  name       = aws_config_configuration_recorder.security_audit.name
-  recording  = true
-  
-  depends_on = [aws_config_delivery_channel.security_audit]
-}
-
 # IAM Analysis Rules
 resource "aws_config_config_rule" "iam_password_policy" {
   name = "${var.project_name}-iam-password-policy"
@@ -528,112 +375,6 @@ resource "aws_config_config_rule" "iam_password_policy" {
   source {
     owner             = "AWS"
     source_identifier = "IAM_PASSWORD_POLICY"
-  }
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-resource "aws_config_config_rule" "iam_user_mfa" {
-  name = "${var.project_name}-iam-user-mfa"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "MFA_ENABLED_FOR_IAM_CONSOLE_ACCESS"
-  }
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-resource "aws_config_config_rule" "iam_access_keys_rotated" {
-  name = "${var.project_name}-iam-access-keys-rotated"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "ACCESS_KEYS_ROTATED"
-  }
-  
-  input_parameters = jsonencode({
-    maxAccessKeyAge = 90
-  })
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-# Security Group Rules
-resource "aws_config_config_rule" "security_groups_restricted_common_ports" {
-  name = "${var.project_name}-security-groups-restricted-common-ports"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "RESTRICTED_INCOMING_TRAFFIC"
-  }
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-resource "aws_config_config_rule" "security_groups_attached_to_eni" {
-  name = "${var.project_name}-security-groups-attached-to-eni"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "SECURITY_GROUP_ATTACHED_TO_ENI"
-  }
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-# VPC Rules
-resource "aws_config_config_rule" "vpc_default_security_group_closed" {
-  name = "${var.project_name}-vpc-default-security-group-closed"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "VPC_DEFAULT_SECURITY_GROUP_CLOSED"
-  }
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-resource "aws_config_config_rule" "vpc_flow_logs_enabled" {
-  name = "${var.project_name}-vpc-flow-logs-enabled"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "VPC_FLOW_LOGS_ENABLED"
-  }
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-# Encryption Rules
-resource "aws_config_config_rule" "s3_bucket_encryption" {
-  name = "${var.project_name}-s3-bucket-encryption"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "S3_BUCKET_SERVER_SIDE_ENCRYPTION_ENABLED"
-  }
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-resource "aws_config_config_rule" "ebs_volume_encryption" {
-  name = "${var.project_name}-ebs-volume-encryption"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "ENCRYPTED_VOLUMES"
-  }
-  
-  depends_on = [aws_config_configuration_recorder.security_audit]
-}
-
-resource "aws_config_config_rule" "rds_encryption" {
-  name = "${var.project_name}-rds-encryption"
-  
-  source {
-    owner             = "AWS"
-    source_identifier = "RDS_STORAGE_ENCRYPTED"
   }
   
   depends_on = [aws_config_configuration_recorder.security_audit]
@@ -679,13 +420,13 @@ resource "aws_config_config_rule" "rds_encryption" {
 ### Scheduled Audits
 ```bash
 # Daily security audit
-0 2 * * * /path/to/aws-audit/scripts/run_audit.sh --security
+0 2 * * * /path/to/aws-audit-framework/scripts/run_audit.sh --security
 
 # Weekly comprehensive audit
-0 3 * * 0 /path/to/aws-audit/scripts/run_audit.sh --comprehensive
+0 3 * * 0 /path/to/aws-audit-framework/scripts/run_audit.sh --comprehensive
 
 # Monthly cost audit
-0 4 1 * * /path/to/aws-audit/scripts/run_audit.sh --cost
+0 4 1 * * /path/to/aws-audit-framework/scripts/run_audit.sh --cost
 ```
 
 ### CI/CD Integration
@@ -708,16 +449,16 @@ jobs:
           python-version: '3.9'
       - name: Install dependencies
         run: |
-          pip install -r aws-audit/python/requirements.txt
+          pip install -r aws-audit-framework/python/requirements.txt
       - name: Run audit
         run: |
-          cd aws-audit/python
+          cd aws-audit-framework/python
           python audit_framework.py --comprehensive
       - name: Upload reports
         uses: actions/upload-artifact@v2
         with:
           name: audit-reports
-          path: aws-audit/python/reports/
+          path: aws-audit-framework/python/reports/
 ```
 
 ## 🚨 Alerting and Notifications
@@ -847,3 +588,20 @@ python -c "import boto3; print(boto3.client('sts').get_caller_identity())"
 ## 📄 License
 
 This project is provided as-is for educational and demonstration purposes. Please review and modify according to your specific requirements and security policies.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📝 Changelog
+
+### Version 1.0.0
+- Initial release with Python and Terraform implementations
+- Comprehensive security, cost, performance, and compliance auditing
+- Automated report generation in multiple formats
+- CI/CD integration and scheduled audits
+- Enterprise-grade security and monitoring features

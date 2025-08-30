@@ -1,6 +1,6 @@
 # AWS Landing Zone with Automation
 
-This project provides a comprehensive AWS Landing Zone implementation with automated setup, governance, and security controls for enterprise environments. **Three deployment options are available: AWS Control Tower, Terraform, and CloudFormation.**
+A comprehensive AWS Landing Zone implementation with automated setup, governance, and security controls for enterprise environments. This project provides three deployment options: AWS Control Tower, Terraform, and CloudFormation.
 
 ## 🏗️ Architecture Overview
 
@@ -33,6 +33,22 @@ AWS Organization
     └── Sandbox Accounts
 ```
 
+## 📁 Project Structure
+
+```
+aws-landing-zone/
+├── README.md                           # This documentation
+├── automation/                         # Automation scripts
+│   ├── deploy-control-tower.sh        # AWS Control Tower deployment
+│   └── create-account.sh              # Account provisioning automation
+├── custom/                            # Terraform implementation
+│   ├── main.tf                        # Main Terraform configuration
+│   └── variables.tf                   # Terraform variables
+└── cloudformation/                    # CloudFormation implementation
+    ├── main.json                      # Main CloudFormation template
+    └── deploy-landing-zone.sh         # CloudFormation deployment script
+```
+
 ## 🚀 Quick Start
 
 ### Prerequisites
@@ -46,13 +62,13 @@ AWS Organization
 
 #### Option 1: AWS Control Tower (Recommended)
 ```bash
-cd landing-zone/automation
+cd projects/aws-landing-zone/automation
 ./deploy-control-tower.sh
 ```
 
 #### Option 2: Terraform Implementation
 ```bash
-cd landing-zone/custom
+cd projects/aws-landing-zone/custom
 terraform init
 terraform plan
 terraform apply
@@ -60,24 +76,8 @@ terraform apply
 
 #### Option 3: CloudFormation Implementation
 ```bash
-cd landing-zone/cloudformation
+cd projects/aws-landing-zone/cloudformation
 ./deploy-landing-zone.sh -c
-```
-
-## 📁 Project Structure
-
-```
-landing-zone/
-├── README.md                           # This documentation
-├── automation/                         # Automation scripts
-│   ├── deploy-control-tower.sh        # AWS Control Tower deployment
-│   └── create-account.sh              # Account provisioning automation
-├── custom/                            # Terraform implementation
-│   ├── main.tf                        # Main Terraform configuration
-│   └── variables.tf                   # Terraform variables
-└── cloudformation/                    # CloudFormation implementation
-    ├── main.json                      # Main CloudFormation template
-    └── deploy-landing-zone.sh         # CloudFormation deployment script
 ```
 
 ## 🛠️ Implementation Options
@@ -91,11 +91,11 @@ AWS Control Tower is the recommended approach for most enterprises as it provide
 - **Account factory** - Self-service account provisioning
 
 #### Files:
-- `landing-zone/automation/deploy-control-tower.sh`
+- `automation/deploy-control-tower.sh`
 
 #### Deployment Steps:
 ```bash
-cd landing-zone/automation
+cd projects/aws-landing-zone/automation
 ./deploy-control-tower.sh
 ```
 
@@ -113,12 +113,12 @@ cd landing-zone/automation
 For organizations that prefer Infrastructure as Code with Terraform:
 
 #### Files:
-- `landing-zone/custom/main.tf` - Main Terraform configuration
-- `landing-zone/custom/variables.tf` - Terraform variables
+- `custom/main.tf` - Main Terraform configuration
+- `custom/variables.tf` - Terraform variables
 
 #### Deployment Steps:
 ```bash
-cd landing-zone/custom
+cd projects/aws-landing-zone/custom
 
 # Initialize Terraform
 terraform init
@@ -144,33 +144,17 @@ terraform apply
 - ✅ IAM roles and policies
 - ✅ Comprehensive tagging strategy
 
-#### Terraform Configuration Details:
-```hcl
-# Main components in main.tf:
-- aws_organizations_organization
-- aws_organizations_organizational_unit (4 OUs)
-- aws_ssoadmin_instance
-- aws_ssoadmin_permission_set (3 permission sets)
-- aws_config_configuration_recorder
-- aws_cloudtrail
-- aws_s3_bucket (Config and CloudTrail)
-- aws_cloudwatch_dashboard (2 dashboards)
-- aws_sns_topic (3 topics)
-- aws_budgets_budget
-- aws_organizations_policy (SCPs)
-```
-
 ### Option 3: CloudFormation Implementation
 
 For organizations that prefer AWS-native CloudFormation:
 
 #### Files:
-- `landing-zone/cloudformation/main.json` - Main CloudFormation template
-- `landing-zone/cloudformation/deploy-landing-zone.sh` - Deployment script
+- `cloudformation/main.json` - Main CloudFormation template
+- `cloudformation/deploy-landing-zone.sh` - Deployment script
 
 #### Deployment Steps:
 ```bash
-cd landing-zone/cloudformation
+cd projects/aws-landing-zone/cloudformation
 
 # Create new landing zone
 ./deploy-landing-zone.sh -c
@@ -198,22 +182,6 @@ cd landing-zone/cloudformation
 - ✅ Service Control Policies (SCPs) for security
 - ✅ Conditional resource creation based on parameters
 - ✅ Comprehensive outputs and exports
-
-#### CloudFormation Template Details:
-```json
-// Main resources in main.json:
-- AWS::Organizations::Organization
-- AWS::Organizations::OrganizationalUnit (4 OUs)
-- AWS::SSO::Instance
-- AWS::SSO::PermissionSet (3 permission sets)
-- AWS::Config::ConfigurationRecorder
-- AWS::CloudTrail::Trail
-- AWS::S3::Bucket (Config and CloudTrail)
-- AWS::CloudWatch::Dashboard (2 dashboards)
-- AWS::SNS::Topic (3 topics)
-- AWS::Budgets::Budget
-- AWS::Organizations::Policy (SCPs)
-```
 
 ## 🔧 Core Features (All Implementations)
 
@@ -244,7 +212,7 @@ cd landing-zone/cloudformation
 
 ### Account Provisioning (All Implementations)
 ```bash
-cd landing-zone/automation
+cd projects/aws-landing-zone/automation
 
 # Create new account
 ./create-account.sh -n "prod-app-01" -o "Workloads" -e "admin@company.com" -t workload
@@ -421,3 +389,21 @@ aws cloudwatch list-dashboards
 ## 📄 License
 
 This project is provided as-is for educational and demonstration purposes. Please review and modify according to your specific requirements and security policies.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## 📝 Changelog
+
+### Version 1.0.0
+- Initial release with three implementation options
+- AWS Control Tower automation
+- Terraform implementation with full configuration
+- CloudFormation implementation with deployment scripts
+- Account provisioning automation
+- Comprehensive security and compliance features
