@@ -1,0 +1,556 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS Data & Analytics Platform - Complete infrastructure for data lake, ETL, streaming, and analytics",
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "aws-data-analytics",
+      "Description": "Name of the project"
+    },
+    "Environment": {
+      "Type": "String",
+      "Default": "production",
+      "AllowedValues": ["dev", "staging", "production"],
+      "Description": "Environment name"
+    },
+    "DataLakeBucketName": {
+      "Type": "String",
+      "Description": "Name of the S3 bucket for data lake"
+    },
+    "RedshiftClusterIdentifier": {
+      "Type": "String",
+      "Default": "data-analytics-cluster",
+      "Description": "Redshift cluster identifier"
+    },
+    "RedshiftNodeType": {
+      "Type": "String",
+      "Default": "dc2.large",
+      "AllowedValues": ["dc2.large", "dc2.xlarge", "dc2.2xlarge", "dc2.4xlarge", "dc2.8xlarge"],
+      "Description": "Redshift node type"
+    },
+    "RedshiftNumberOfNodes": {
+      "Type": "Number",
+      "Default": 2,
+      "MinValue": 1,
+      "MaxValue": 100,
+      "Description": "Number of Redshift nodes"
+    },
+    "KinesisShardCount": {
+      "Type": "Number",
+      "Default": 2,
+      "MinValue": 1,
+      "MaxValue": 500,
+      "Description": "Number of Kinesis shards"
+    },
+    "SageMakerInstanceType": {
+      "Type": "String",
+      "Default": "ml.t3.medium",
+      "AllowedValues": ["ml.t3.medium", "ml.t3.large", "ml.m5.large", "ml.m5.xlarge", "ml.p3.2xlarge"],
+      "Description": "SageMaker instance type"
+    },
+    "CreateAlarms": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Whether to create CloudWatch alarms"
+    },
+    "LogRetentionDays": {
+      "Type": "Number",
+      "Default": 30,
+      "MinValue": 1,
+      "MaxValue": 3653,
+      "Description": "CloudWatch log retention in days"
+    }
+  },
+  "Conditions": {
+    "IsProduction": {
+      "Fn::Equals": [{"Ref": "Environment"}, "production"]
+    },
+    "CreateAlarms": {
+      "Fn::Equals": [{"Ref": "CreateAlarms"}, "true"]
+    }
+  },
+  "Resources": {
+    "DataLakeBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {"Ref": "DataLakeBucketName"},
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DataLakeLifecycle",
+              "Status": "Enabled",
+              "Transitions": [
+                {
+                  "Days": 30,
+                  "StorageClass": "STANDARD_IA"
+                },
+                {
+                  "Days": 90,
+                  "StorageClass": "GLACIER"
+                },
+                {
+                  "Days": 365,
+                  "StorageClass": "DEEP_ARCHIVE"
+                }
+              ]
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "IgnorePublicAcls": true,
+          "BlockPublicPolicy": true,
+          "RestrictPublicBuckets": true
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {"Fn::Sub": "${ProjectName}-data-lake"}
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    "GlueDatabase": {
+      "Type": "AWS::Glue::Database",
+      "Properties": {
+        "CatalogId": {"Ref": "AWS::AccountId"},
+        "DatabaseInput": {
+          "Name": {"Fn::Sub": "${ProjectName}-catalog"},
+          "Description": "Data lake catalog database",
+          "LocationUri": {"Fn::Sub": "s3://${DataLakeBucket}/"}
+        }
+      }
+    },
+    "GlueCrawlerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {"Fn::Sub": "${ProjectName}-glue-crawler-role"},
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "glue.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "S3Access",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket"
+                  ],
+                  "Resource": [
+                    {"Fn::GetAtt": ["DataLakeBucket", "Arn"]},
+                    {"Fn::Sub": "${DataLakeBucket}/*"}
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "GlueCrawler": {
+      "Type": "AWS::Glue::Crawler",
+      "Properties": {
+        "Name": {"Fn::Sub": "${ProjectName}-crawler"},
+        "Role": {"Ref": "GlueCrawlerRole"},
+        "DatabaseName": {"Ref": "GlueDatabase"},
+        "Targets": {
+          "S3Targets": [
+            {
+              "Path": {"Fn::Sub": "s3://${DataLakeBucket}/raw/"}
+            },
+            {
+              "Path": {"Fn::Sub": "s3://${DataLakeBucket}/processed/"}
+            }
+          ]
+        },
+        "Schedule": "cron(0 2 * * ? *)",
+        "Description": "Data lake crawler for raw and processed data"
+      }
+    },
+    "RedshiftCluster": {
+      "Type": "AWS::Redshift::Cluster",
+      "Properties": {
+        "ClusterIdentifier": {"Ref": "RedshiftClusterIdentifier"},
+        "NodeType": {"Ref": "RedshiftNodeType"},
+        "NumberOfNodes": {"Ref": "RedshiftNumberOfNodes"},
+        "MasterUsername": "admin",
+        "MasterUserPassword": {"Ref": "RedshiftMasterPassword"},
+        "DBName": "analytics",
+        "VpcSecurityGroupIds": [{"Ref": "RedshiftSecurityGroup"}],
+        "ClusterSubnetGroupName": {"Ref": "RedshiftSubnetGroup"},
+        "PubliclyAccessible": false,
+        "Encrypted": true,
+        "LoggingProperties": {
+          "BucketName": {"Ref": "DataLakeBucket"},
+          "S3KeyPrefix": "redshift-logs/"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {"Fn::Sub": "${ProjectName}-redshift-cluster"}
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    "RedshiftMasterPassword": {
+      "Type": "AWS::SSM::Parameter::Value<String>",
+      "Default": "/redshift/master-password"
+    },
+    "RedshiftSubnetGroup": {
+      "Type": "AWS::Redshift::ClusterSubnetGroup",
+      "Properties": {
+        "Description": "Redshift subnet group",
+        "SubnetIds": {"Ref": "PrivateSubnets"}
+      }
+    },
+    "RedshiftSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Redshift security group",
+        "VpcId": {"Ref": "VPC"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 5439,
+            "ToPort": 5439,
+            "SourceSecurityGroupId": {"Ref": "RedshiftSecurityGroup"}
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {"Fn::Sub": "${ProjectName}-redshift-sg"}
+          }
+        ]
+      }
+    },
+    "KinesisDataStream": {
+      "Type": "AWS::Kinesis::Stream",
+      "Properties": {
+        "Name": {"Fn::Sub": "${ProjectName}-data-stream"},
+        "ShardCount": {"Ref": "KinesisShardCount"},
+        "RetentionPeriodHours": 24,
+        "StreamEncryption": {
+          "EncryptionType": "KMS",
+          "KeyId": "alias/aws/kinesis"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {"Fn::Sub": "${ProjectName}-data-stream"}
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    "KinesisDataFirehose": {
+      "Type": "AWS::KinesisFirehose::DeliveryStream",
+      "Properties": {
+        "DeliveryStreamName": {"Fn::Sub": "${ProjectName}-firehose"},
+        "DeliveryStreamType": "KinesisStreamAsSource",
+        "KinesisStreamSourceConfiguration": {
+          "KinesisStreamARN": {"Fn::GetAtt": ["KinesisDataStream", "Arn"]},
+          "RoleARN": {"Fn::GetAtt": ["KinesisFirehoseRole", "Arn"]}
+        },
+        "ExtendedS3DestinationConfiguration": {
+          "BucketARN": {"Fn::GetAtt": ["DataLakeBucket", "Arn"]},
+          "Prefix": "raw/kinesis/",
+          "BufferingHints": {
+            "SizeInMBs": 64,
+            "IntervalInSeconds": 60
+          },
+          "CompressionFormat": "GZIP",
+          "RoleARN": {"Fn::GetAtt": ["KinesisFirehoseRole", "Arn"]}
+        }
+      }
+    },
+    "KinesisFirehoseRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {"Fn::Sub": "${ProjectName}-firehose-role"},
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "firehose.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "S3Access",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:AbortMultipartUpload",
+                    "s3:GetBucketLocation",
+                    "s3:GetObject",
+                    "s3:ListBucket",
+                    "s3:ListBucketMultipartUploads",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    {"Fn::GetAtt": ["DataLakeBucket", "Arn"]},
+                    {"Fn::Sub": "${DataLakeBucket}/*"}
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "PolicyName": "KinesisAccess",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "kinesis:DescribeStream",
+                    "kinesis:GetShardIterator",
+                    "kinesis:GetRecords",
+                    "kinesis:ListShards"
+                  ],
+                  "Resource": {"Fn::GetAtt": ["KinesisDataStream", "Arn"]}
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "SageMakerNotebookInstance": {
+      "Type": "AWS::SageMaker::NotebookInstance",
+      "Properties": {
+        "NotebookInstanceName": {"Fn::Sub": "${ProjectName}-notebook"},
+        "InstanceType": {"Ref": "SageMakerInstanceType"},
+        "RoleArn": {"Fn::GetAtt": ["SageMakerRole", "Arn"]},
+        "VolumeSizeInGB": 20,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {"Fn::Sub": "${ProjectName}-notebook"}
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    "SageMakerRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {"Fn::Sub": "${ProjectName}-sagemaker-role"},
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "sagemaker.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonSageMakerFullAccess"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "S3Access",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "s3:DeleteObject",
+                    "s3:ListBucket"
+                  ],
+                  "Resource": [
+                    {"Fn::GetAtt": ["DataLakeBucket", "Arn"]},
+                    {"Fn::Sub": "${DataLakeBucket}/*"}
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "QuickSightDataSource": {
+      "Type": "AWS::QuickSight::DataSource",
+      "Properties": {
+        "AwsAccountId": {"Ref": "AWS::AccountId"},
+        "DataSourceId": {"Fn::Sub": "${ProjectName}-datasource"},
+        "Name": {"Fn::Sub": "${ProjectName}-datasource"},
+        "Type": "S3",
+        "DataSourceParameters": {
+          "S3Parameters": {
+            "ManifestFileLocation": {
+              "Bucket": {"Ref": "DataLakeBucket"},
+              "Key": "quicksight/manifest.json"
+            }
+          }
+        },
+        "Permissions": [
+          {
+            "Principal": {"Ref": "QuickSightUserArn"},
+            "Actions": ["quicksight:DescribeDataSource", "quicksight:DescribeDataSourcePermissions", "quicksight:PassDataSource", "quicksight:DescribeIngestion", "quicksight:ListIngestions"]
+          }
+        ]
+      }
+    },
+    "QuickSightUserArn": {
+      "Type": "String",
+      "Default": "",
+      "Description": "QuickSight user ARN"
+    },
+    "CloudWatchLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {"Fn::Sub": "/aws/data-analytics/${ProjectName}"},
+        "RetentionInDays": {"Ref": "LogRetentionDays"}
+      }
+    },
+    "DataAnalyticsAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Condition": "CreateAlarms",
+      "Properties": {
+        "AlarmName": {"Fn::Sub": "${ProjectName}-data-processing-errors"},
+        "AlarmDescription": "Data processing errors alarm",
+        "MetricName": "IncomingRecords",
+        "Namespace": "AWS/Kinesis",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 2,
+        "Threshold": 0,
+        "ComparisonOperator": "LessThanThreshold",
+        "Dimensions": [
+          {
+            "Name": "StreamName",
+            "Value": {"Ref": "KinesisDataStream"}
+          }
+        ],
+        "AlarmActions": [{"Ref": "SNSTopic"}]
+      }
+    },
+    "SNSTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": {"Fn::Sub": "${ProjectName}-alerts"},
+        "DisplayName": "Data Analytics Alerts"
+      }
+    }
+  },
+  "Outputs": {
+    "DataLakeBucketName": {
+      "Description": "Name of the S3 bucket for data lake",
+      "Value": {"Ref": "DataLakeBucket"},
+      "Export": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-DataLakeBucketName"}
+      }
+    },
+    "DataLakeBucketArn": {
+      "Description": "ARN of the S3 bucket for data lake",
+      "Value": {"Fn::GetAtt": ["DataLakeBucket", "Arn"]},
+      "Export": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-DataLakeBucketArn"}
+      }
+    },
+    "GlueDatabaseName": {
+      "Description": "Name of the Glue database",
+      "Value": {"Ref": "GlueDatabase"},
+      "Export": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-GlueDatabaseName"}
+      }
+    },
+    "RedshiftClusterEndpoint": {
+      "Description": "Redshift cluster endpoint",
+      "Value": {"Fn::GetAtt": ["RedshiftCluster", "Endpoint.Address"]},
+      "Export": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-RedshiftClusterEndpoint"}
+      }
+    },
+    "KinesisDataStreamName": {
+      "Description": "Name of the Kinesis data stream",
+      "Value": {"Ref": "KinesisDataStream"},
+      "Export": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-KinesisDataStreamName"}
+      }
+    },
+    "KinesisDataStreamArn": {
+      "Description": "ARN of the Kinesis data stream",
+      "Value": {"Fn::GetAtt": ["KinesisDataStream", "Arn"]},
+      "Export": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-KinesisDataStreamArn"}
+      }
+    },
+    "SageMakerNotebookInstanceName": {
+      "Description": "Name of the SageMaker notebook instance",
+      "Value": {"Ref": "SageMakerNotebookInstance"},
+      "Export": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-SageMakerNotebookInstanceName"}
+      }
+    },
+    "QuickSightDataSourceId": {
+      "Description": "ID of the QuickSight data source",
+      "Value": {"Ref": "QuickSightDataSource"},
+      "Export": {
+        "Name": {"Fn::Sub": "${AWS::StackName}-QuickSightDataSourceId"}
+      }
+    }
+  }
+}
