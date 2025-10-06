@@ -1,0 +1,524 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS Container & Kubernetes Platform - Complete infrastructure for container orchestration and management",
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "aws-container-platform",
+      "Description": "Name of the project"
+    },
+    "Environment": {
+      "Type": "String",
+      "Default": "production",
+      "AllowedValues": ["dev", "staging", "production"],
+      "Description": "Environment name"
+    },
+    "VpcId": {
+      "Type": "AWS::EC2::VPC::Id",
+      "Description": "VPC ID for the EKS cluster"
+    },
+    "SubnetIds": {
+      "Type": "CommaDelimitedList",
+      "Description": "List of subnet IDs for the EKS cluster"
+    },
+    "NodeInstanceType": {
+      "Type": "String",
+      "Default": "t3.medium",
+      "AllowedValues": ["t3.small", "t3.medium", "t3.large", "t3.xlarge", "m5.large", "m5.xlarge", "m5.2xlarge", "c5.large", "c5.xlarge", "c5.2xlarge"],
+      "Description": "EC2 instance type for EKS nodes"
+    },
+    "NodeGroupMinSize": {
+      "Type": "Number",
+      "Default": 1,
+      "MinValue": 1,
+      "MaxValue": 10,
+      "Description": "Minimum number of nodes in the node group"
+    },
+    "NodeGroupMaxSize": {
+      "Type": "Number",
+      "Default": 10,
+      "MinValue": 1,
+      "MaxValue": 100,
+      "Description": "Maximum number of nodes in the node group"
+    },
+    "NodeGroupDesiredSize": {
+      "Type": "Number",
+      "Default": 3,
+      "MinValue": 1,
+      "MaxValue": 100,
+      "Description": "Desired number of nodes in the node group"
+    },
+    "EksVersion": {
+      "Type": "String",
+      "Default": "1.27",
+      "AllowedValues": ["1.24", "1.25", "1.26", "1.27", "1.28"],
+      "Description": "EKS cluster version"
+    },
+    "EnablePublicEndpoint": {
+      "Type": "String",
+      "Default": "false",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable public API server endpoint"
+    },
+    "EnablePrivateEndpoint": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable private API server endpoint"
+    },
+    "EnableLogging": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable EKS control plane logging"
+    },
+    "LogRetentionDays": {
+      "Type": "Number",
+      "Default": 30,
+      "MinValue": 1,
+      "MaxValue": 3653,
+      "Description": "CloudWatch log retention in days"
+    }
+  },
+  "Conditions": {
+    "IsProduction": {
+      "Fn::Equals": [{"Ref": "Environment"}, "production"]
+    },
+    "EnablePublicEndpoint": {
+      "Fn::Equals": [{"Ref": "EnablePublicEndpoint"}, "true"]
+    },
+    "EnablePrivateEndpoint": {
+      "Fn::Equals": [{"Ref": "EnablePrivateEndpoint"}, "true"]
+    },
+    "EnableLogging": {
+      "Fn::Equals": [{"Ref": "EnableLogging"}, "true"]
+    }
+  },
+  "Resources": {
+    "EksClusterRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "eks.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
+        ]
+      }
+    },
+    "EksNodeGroupRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "ec2.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy",
+          "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy",
+          "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
+        ]
+      }
+    },
+    "EksCluster": {
+      "Type": "AWS::EKS::Cluster",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-${Environment}"
+        },
+        "Version": {"Ref": "EksVersion"},
+        "RoleArn": {"Fn::GetAtt": ["EksClusterRole", "Arn"]},
+        "ResourcesVpcConfig": {
+          "SubnetIds": {"Ref": "SubnetIds"},
+          "SecurityGroupIds": [{"Ref": "EksClusterSecurityGroup"}],
+          "EndpointConfig": {
+            "PublicAccess": {"Ref": "EnablePublicEndpoint"},
+            "PrivateAccess": {"Ref": "EnablePrivateEndpoint"}
+          }
+        },
+        "Logging": {
+          "Fn::If": [
+            "EnableLogging",
+            {
+              "ClusterLogging": {
+                "EnabledTypes": [
+                  {
+                    "Type": "api"
+                  },
+                  {
+                    "Type": "audit"
+                  },
+                  {
+                    "Type": "authenticator"
+                  },
+                  {
+                    "Type": "controllerManager"
+                  },
+                  {
+                    "Type": "scheduler"
+                  }
+                ]
+              }
+            },
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "EncryptionConfig": [
+          {
+            "Provider": {
+              "KeyId": {"Ref": "EksKmsKey"}
+            },
+            "Resources": ["secrets"]
+          }
+        ]
+      }
+    },
+    "EksClusterSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security group for EKS cluster",
+        "VpcId": {"Ref": "VpcId"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 443,
+            "ToPort": 443,
+            "CidrIp": "0.0.0.0/0",
+            "Description": "HTTPS from anywhere"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0",
+            "Description": "All outbound traffic"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-${Environment}-cluster-sg"
+            }
+          }
+        ]
+      }
+    },
+    "EksNodeGroupSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security group for EKS node group",
+        "VpcId": {"Ref": "VpcId"},
+        "SecurityGroupIngress": [
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 0,
+            "ToPort": 65535,
+            "SourceSecurityGroupId": {"Ref": "EksNodeGroupSecurityGroup"},
+            "Description": "All traffic from self"
+          },
+          {
+            "IpProtocol": "tcp",
+            "FromPort": 0,
+            "ToPort": 65535,
+            "SourceSecurityGroupId": {"Ref": "EksClusterSecurityGroup"},
+            "Description": "All traffic from cluster"
+          }
+        ],
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0",
+            "Description": "All outbound traffic"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-${Environment}-nodegroup-sg"
+            }
+          }
+        ]
+      }
+    },
+    "EksKmsKey": {
+      "Type": "AWS::KMS::Key",
+      "Properties": {
+        "Description": {
+          "Fn::Sub": "KMS key for EKS cluster ${ProjectName}-${Environment}"
+        },
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root"
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            },
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "eks.amazonaws.com"
+              },
+              "Action": [
+                "kms:Encrypt",
+                "kms:Decrypt",
+                "kms:ReEncrypt*",
+                "kms:GenerateDataKey*",
+                "kms:DescribeKey"
+              ],
+              "Resource": "*"
+            }
+          ]
+        }
+      }
+    },
+    "EksKmsKeyAlias": {
+      "Type": "AWS::KMS::Alias",
+      "Properties": {
+        "AliasName": {
+          "Fn::Sub": "alias/${ProjectName}-${Environment}-eks"
+        },
+        "TargetKeyId": {"Ref": "EksKmsKey"}
+      }
+    },
+    "EksNodeGroup": {
+      "Type": "AWS::EKS::Nodegroup",
+      "Properties": {
+        "ClusterName": {"Ref": "EksCluster"},
+        "NodegroupName": {
+          "Fn::Sub": "${ProjectName}-${Environment}-nodegroup"
+        },
+        "NodeRole": {"Fn::GetAtt": ["EksNodeGroupRole", "Arn"]},
+        "Subnets": {"Ref": "SubnetIds"},
+        "InstanceTypes": [{"Ref": "NodeInstanceType"}],
+        "AmiType": "AL2_x86_64",
+        "CapacityType": "ON_DEMAND",
+        "ScalingConfig": {
+          "MinSize": {"Ref": "NodeGroupMinSize"},
+          "MaxSize": {"Ref": "NodeGroupMaxSize"},
+          "DesiredSize": {"Ref": "NodeGroupDesiredSize"}
+        },
+        "UpdateConfig": {
+          "MaxUnavailablePercentage": 25
+        },
+        "RemoteAccess": {
+          "SourceSecurityGroups": [{"Ref": "EksNodeGroupSecurityGroup"}]
+        },
+        "Tags": {
+          "Name": {
+            "Fn::Sub": "${ProjectName}-${Environment}-nodegroup"
+          },
+          "Environment": {"Ref": "Environment"}
+        }
+      }
+    },
+    "EksAddonVpcCni": {
+      "Type": "AWS::EKS::Addon",
+      "Properties": {
+        "ClusterName": {"Ref": "EksCluster"},
+        "AddonName": "vpc-cni",
+        "AddonVersion": "v1.12.6-eksbuild.2",
+        "ResolveConflicts": "OVERWRITE"
+      }
+    },
+    "EksAddonCoreDns": {
+      "Type": "AWS::EKS::Addon",
+      "Properties": {
+        "ClusterName": {"Ref": "EksCluster"},
+        "AddonName": "coredns",
+        "AddonVersion": "v1.10.1-eksbuild.1",
+        "ResolveConflicts": "OVERWRITE"
+      }
+    },
+    "EksAddonKubeProxy": {
+      "Type": "AWS::EKS::Addon",
+      "Properties": {
+        "ClusterName": {"Ref": "EksCluster"},
+        "AddonName": "kube-proxy",
+        "AddonVersion": "v1.27.1-eksbuild.1",
+        "ResolveConflicts": "OVERWRITE"
+      }
+    },
+    "EksAddonEbsCsiDriver": {
+      "Type": "AWS::EKS::Addon",
+      "Properties": {
+        "ClusterName": {"Ref": "EksCluster"},
+        "AddonName": "aws-ebs-csi-driver",
+        "AddonVersion": "v1.19.0-eksbuild.2",
+        "ResolveConflicts": "OVERWRITE"
+      }
+    },
+    "EcrRepository": {
+      "Type": "AWS::ECR::Repository",
+      "Properties": {
+        "RepositoryName": {
+          "Fn::Sub": "${ProjectName}-${Environment}"
+        },
+        "ImageTagMutability": "MUTABLE",
+        "ImageScanningConfiguration": {
+          "ScanOnPush": true
+        },
+        "LifecyclePolicy": {
+          "LifecyclePolicyText": {
+            "Fn::Sub": "{\n  \"rules\": [\n    {\n      \"rulePriority\": 1,\n      \"description\": \"Keep last 10 production images\",\n      \"selection\": {\n        \"tagStatus\": \"tagged\",\n        \"tagPrefixList\": [\"prod\", \"production\"],\n        \"countType\": \"imageCountMoreThan\",\n        \"countNumber\": 10\n      },\n      \"action\": {\n        \"type\": \"expire\"\n      }\n    },\n    {\n      \"rulePriority\": 2,\n      \"description\": \"Delete untagged images older than 1 day\",\n      \"selection\": {\n        \"tagStatus\": \"untagged\",\n        \"countType\": \"sinceImagePushed\",\n        \"countUnit\": \"days\",\n        \"countNumber\": 1\n      },\n      \"action\": {\n        \"type\": \"expire\"\n      }\n    }\n  ]\n}"
+          }
+        }
+      }
+    },
+    "EksCloudWatchLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Condition": "EnableLogging",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/eks/${ProjectName}-${Environment}/cluster"
+        },
+        "RetentionInDays": {"Ref": "LogRetentionDays"}
+      }
+    },
+    "EksClusterAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Condition": "IsProduction",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${ProjectName}-${Environment}-cluster-health"
+        },
+        "AlarmDescription": "EKS cluster health check",
+        "MetricName": "cluster_health",
+        "Namespace": "AWS/EKS",
+        "Statistic": "Maximum",
+        "Period": 300,
+        "EvaluationPeriods": 2,
+        "Threshold": 1,
+        "ComparisonOperator": "LessThanThreshold",
+        "Dimensions": [
+          {
+            "Name": "ClusterName",
+            "Value": {"Ref": "EksCluster"}
+          }
+        ]
+      }
+    }
+  },
+  "Outputs": {
+    "EksClusterName": {
+      "Description": "Name of the EKS cluster",
+      "Value": {"Ref": "EksCluster"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-EksClusterName"
+        }
+      }
+    },
+    "EksClusterArn": {
+      "Description": "ARN of the EKS cluster",
+      "Value": {"Fn::GetAtt": ["EksCluster", "Arn"]},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-EksClusterArn"
+        }
+      }
+    },
+    "EksClusterEndpoint": {
+      "Description": "Endpoint URL for the EKS cluster",
+      "Value": {"Fn::GetAtt": ["EksCluster", "Endpoint"]},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-EksClusterEndpoint"
+        }
+      }
+    },
+    "EksClusterSecurityGroupId": {
+      "Description": "Security group ID for the EKS cluster",
+      "Value": {"Ref": "EksClusterSecurityGroup"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-EksClusterSecurityGroupId"
+        }
+      }
+    },
+    "EksNodeGroupName": {
+      "Description": "Name of the EKS node group",
+      "Value": {"Ref": "EksNodeGroup"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-EksNodeGroupName"
+        }
+      }
+    },
+    "EksNodeGroupArn": {
+      "Description": "ARN of the EKS node group",
+      "Value": {"Fn::GetAtt": ["EksNodeGroup", "Arn"]},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-EksNodeGroupArn"
+        }
+      }
+    },
+    "EcrRepositoryUri": {
+      "Description": "URI of the ECR repository",
+      "Value": {"Fn::GetAtt": ["EcrRepository", "RepositoryUri"]},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-EcrRepositoryUri"
+        }
+      }
+    },
+    "EcrRepositoryArn": {
+      "Description": "ARN of the ECR repository",
+      "Value": {"Fn::GetAtt": ["EcrRepository", "Arn"]},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-EcrRepositoryArn"
+        }
+      }
+    },
+    "KmsKeyId": {
+      "Description": "ID of the KMS key for EKS encryption",
+      "Value": {"Ref": "EksKmsKey"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-KmsKeyId"
+        }
+      }
+    },
+    "KmsKeyArn": {
+      "Description": "ARN of the KMS key for EKS encryption",
+      "Value": {"Fn::GetAtt": ["EksKmsKey", "Arn"]},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-KmsKeyArn"
+        }
+      }
+    },
+    "KubectlConfigCommand": {
+      "Description": "Command to configure kubectl",
+      "Value": {
+        "Fn::Sub": "aws eks update-kubeconfig --region ${AWS::Region} --name ${EksCluster}"
+      }
+    }
+  }
+}
