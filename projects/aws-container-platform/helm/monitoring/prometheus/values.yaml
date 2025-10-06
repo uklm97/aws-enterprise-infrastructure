@@ -1,0 +1,298 @@
+# Prometheus Monitoring Stack Configuration
+# This file contains the default values for the Prometheus monitoring stack
+
+# Enable/disable the kube-prometheus-stack
+kube-prometheus-stack:
+  enabled: true
+  
+  # Global configuration
+  global:
+    imageRegistry: ""
+    imagePullSecrets: []
+    storageClass: ""
+  
+  # Grafana configuration
+  grafana:
+    enabled: true
+    adminPassword: "admin123"
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClassName: "gp2"
+    
+    service:
+      type: LoadBalancer
+      port: 80
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
+        service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    
+    grafana.ini:
+      server:
+        root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+      security:
+        allow_embedding: true
+      auth.anonymous:
+        enabled: true
+        org_role: Viewer
+    
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+    
+    dashboards:
+      default:
+        kubernetes-cluster-monitoring:
+          gnetId: 7249
+          revision: 1
+          datasource: Prometheus
+        kubernetes-pod-monitoring:
+          gnetId: 6417
+          revision: 1
+          datasource: Prometheus
+        nginx-ingress-controller:
+          gnetId: 9614
+          revision: 1
+          datasource: Prometheus
+  
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    prometheusSpec:
+      retention: 30d
+      retentionSize: 50GB
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: "gp2"
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 50Gi
+      
+      serviceMonitorSelectorNilUsesHelmValues: false
+      serviceMonitorSelector: {}
+      serviceMonitorNamespaceSelector: {}
+      
+      ruleSelectorNilUsesHelmValues: false
+      ruleSelector: {}
+      ruleNamespaceSelector: {}
+      
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          cpu: 1000m
+          memory: 4Gi
+      
+      # Additional scrape configs
+      additionalScrapeConfigs:
+        - job_name: 'kubernetes-pods'
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+              action: keep
+              regex: true
+            - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+              action: replace
+              target_label: __metrics_path__
+              regex: (.+)
+            - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+              action: replace
+              regex: ([^:]+)(?::\d+)?;(\d+)
+              replacement: $1:$2
+              target_label: __address__
+            - action: labelmap
+              regex: __meta_kubernetes_pod_label_(.+)
+            - source_labels: [__meta_kubernetes_namespace]
+              action: replace
+              target_label: kubernetes_namespace
+            - source_labels: [__meta_kubernetes_pod_name]
+              action: replace
+              target_label: kubernetes_pod_name
+    
+    service:
+      type: LoadBalancer
+      port: 9090
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
+        service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+  
+  # Alertmanager configuration
+  alertmanager:
+    enabled: true
+    alertmanagerSpec:
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: "gp2"
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+      
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 200m
+          memory: 256Mi
+      
+      # Alertmanager configuration
+      config:
+        global:
+          smtp_smarthost: 'localhost:587'
+          smtp_from: 'alertmanager@example.com'
+        
+        route:
+          group_by: ['alertname']
+          group_wait: 10s
+          group_interval: 10s
+          repeat_interval: 1h
+          receiver: 'web.hook'
+        
+        receivers:
+        - name: 'web.hook'
+          webhook_configs:
+          - url: 'http://127.0.0.1:5001/'
+    
+    service:
+      type: LoadBalancer
+      port: 9093
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: nlb
+        service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+  
+  # Node Exporter configuration
+  nodeExporter:
+    enabled: true
+    hostRootFsMount:
+      enabled: true
+  
+  # Kube State Metrics configuration
+  kubeStateMetrics:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  
+  # Prometheus Operator configuration
+  prometheusOperator:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+    
+    # Create ServiceMonitor for Prometheus Operator
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+  
+  # Default rules configuration
+  defaultRules:
+    create: true
+    rules:
+      alertmanager: true
+      etcd: true
+      general: true
+      k8s: true
+      kubeApiserver: true
+      kubeApiserverAvailability: true
+      kubeApiserverError: true
+      kubeApiserverSlos: true
+      kubelet: true
+      kubeProxy: true
+      kubePrometheusGeneral: true
+      kubePrometheusNodeRecording: true
+      kubernetesApps: true
+      kubernetesResources: true
+      kubernetesStorage: true
+      kubernetesSystem: true
+      kubeScheduler: true
+      kubeStateMetrics: true
+      network: true
+      node: true
+      nodeExporterAlerting: true
+      nodeExporterRecording: true
+      prometheus: true
+      prometheusOperator: true
+      time: true
+
+# Custom ServiceMonitors
+serviceMonitors:
+  - name: nginx-ingress-controller
+    namespace: ingress-nginx
+    labels:
+      app: nginx-ingress-controller
+    selector:
+      matchLabels:
+        app: nginx-ingress-controller
+    endpoints:
+      - port: metrics
+        path: /metrics
+        interval: 30s
+
+# Custom PrometheusRules
+prometheusRules:
+  - name: custom-alerts
+    namespace: monitoring
+    labels:
+      app: prometheus
+    groups:
+      - name: custom.rules
+        rules:
+          - alert: HighCPUUsage
+            expr: 100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High CPU usage detected"
+              description: "CPU usage is above 80% for more than 5 minutes"
+          
+          - alert: HighMemoryUsage
+            expr: 100 - ((node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes) * 100) > 80
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "High memory usage detected"
+              description: "Memory usage is above 80% for more than 5 minutes"
+          
+          - alert: PodCrashLooping
+            expr: rate(kube_pod_container_status_restarts_total[15m]) > 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Pod is crash looping"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} is restarting frequently"
+          
+          - alert: NodeNotReady
+            expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "Node is not ready"
+              description: "Node {{ $labels.node }} has been not ready for more than 5 minutes"
