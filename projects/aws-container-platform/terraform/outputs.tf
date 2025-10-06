@@ -22,11 +22,6 @@ output "public_subnets" {
   value       = module.vpc.public_subnets
 }
 
-output "nat_gateway_ids" {
-  description = "List of IDs of the NAT Gateways"
-  value       = module.vpc.natgw_ids
-}
-
 # EKS Cluster Outputs
 output "cluster_id" {
   description = "The name/id of the EKS cluster"
@@ -48,14 +43,9 @@ output "cluster_security_group_id" {
   value       = module.eks_cluster.cluster_security_group_id
 }
 
-output "cluster_iam_role_name" {
-  description = "IAM role name associated with EKS cluster"
-  value       = module.eks_cluster.cluster_iam_role_name
-}
-
-output "cluster_iam_role_arn" {
-  description = "IAM role ARN associated with EKS cluster"
-  value       = module.eks_cluster.cluster_iam_role_arn
+output "cluster_primary_security_group_id" {
+  description = "The cluster primary security group ID created by EKS"
+  value       = module.eks_cluster.cluster_primary_security_group_id
 }
 
 output "cluster_certificate_authority_data" {
@@ -73,101 +63,106 @@ output "cluster_status" {
   value       = module.eks_cluster.cluster_status
 }
 
-output "cluster_version" {
-  description = "The Kubernetes version for the EKS cluster"
-  value       = module.eks_cluster.cluster_version
+output "cluster_iam_role_name" {
+  description = "IAM role name associated with EKS cluster"
+  value       = module.eks_cluster.cluster_iam_role_name
 }
 
-# Node Group Outputs
-output "node_groups" {
-  description = "Map of attribute maps for all EKS node groups"
+output "cluster_iam_role_arn" {
+  description = "IAM role ARN associated with EKS cluster"
+  value       = module.eks_cluster.cluster_iam_role_arn
+}
+
+# EKS Node Groups Outputs
+output "eks_managed_node_groups" {
+  description = "Map of attribute maps for all EKS managed node groups created"
   value       = module.eks_cluster.eks_managed_node_groups
 }
 
-output "node_security_group_id" {
-  description = "ID of the node shared security group"
-  value       = module.eks_cluster.node_security_group_id
+output "eks_managed_node_groups_autoscaling_group_names" {
+  description = "List of the autoscaling group names created by EKS managed node groups"
+  value       = module.eks_cluster.eks_managed_node_groups_autoscaling_group_names
 }
 
-output "node_security_group_arn" {
-  description = "Amazon Resource Name (ARN) of the node shared security group"
-  value       = module.eks_cluster.node_security_group_arn
+# EKS Addons Outputs
+output "cluster_addons" {
+  description = "Map of attribute maps for all EKS cluster addons created"
+  value       = module.eks_cluster.cluster_addons
 }
 
 # ECR Outputs
 output "ecr_repository_urls" {
   description = "Map of ECR repository URLs"
-  value       = { for k, v in aws_ecr_repository.repositories : k => v.repository_url }
+  value = {
+    for k, v in aws_ecr_repository.repositories : k => v.repository_url
+  }
 }
 
 output "ecr_repository_arns" {
   description = "Map of ECR repository ARNs"
-  value       = { for k, v in aws_ecr_repository.repositories : k => v.arn }
+  value = {
+    for k, v in aws_ecr_repository.repositories : k => v.arn
+  }
 }
 
 # KMS Outputs
 output "kms_key_id" {
   description = "The globally unique identifier for the key"
-  value       = var.cluster_encryption_enabled ? aws_kms_key.eks[0].key_id : null
+  value       = aws_kms_key.eks.key_id
 }
 
 output "kms_key_arn" {
   description = "The Amazon Resource Name (ARN) of the key"
-  value       = var.cluster_encryption_enabled ? aws_kms_key.eks[0].arn : null
+  value       = aws_kms_key.eks.arn
 }
 
 output "kms_alias_name" {
   description = "The display name of the alias"
-  value       = var.cluster_encryption_enabled ? aws_kms_alias.eks[0].name : null
+  value       = aws_kms_alias.eks.name
 }
 
-# CloudWatch Outputs
+# CloudWatch Logs Outputs
 output "cloudwatch_log_group_name" {
   description = "Name of the CloudWatch log group"
-  value       = aws_cloudwatch_log_group.eks_logs.name
+  value       = aws_cloudwatch_log_group.eks_cluster.name
 }
 
 output "cloudwatch_log_group_arn" {
   description = "ARN of the CloudWatch log group"
-  value       = aws_cloudwatch_log_group.eks_logs.arn
+  value       = aws_cloudwatch_log_group.eks_cluster.arn
 }
 
-# CloudWatch Alarms
-output "cpu_high_alarm_name" {
-  description = "Name of the CPU high CloudWatch alarm"
-  value       = var.create_alarms ? aws_cloudwatch_metric_alarm.cluster_cpu_high[0].alarm_name : null
-}
-
-output "cpu_high_alarm_arn" {
-  description = "ARN of the CPU high CloudWatch alarm"
-  value       = var.create_alarms ? aws_cloudwatch_metric_alarm.cluster_cpu_high[0].arn : null
-}
-
-output "memory_high_alarm_name" {
-  description = "Name of the memory high CloudWatch alarm"
-  value       = var.create_alarms ? aws_cloudwatch_metric_alarm.cluster_memory_high[0].alarm_name : null
-}
-
-output "memory_high_alarm_arn" {
-  description = "ARN of the memory high CloudWatch alarm"
-  value       = var.create_alarms ? aws_cloudwatch_metric_alarm.cluster_memory_high[0].arn : null
-}
-
-# S3 Backup Outputs
-output "backup_bucket_name" {
-  description = "Name of the S3 bucket for cluster backups"
-  value       = var.create_backup_bucket ? aws_s3_bucket.cluster_backups[0].bucket : null
-}
-
-output "backup_bucket_arn" {
-  description = "ARN of the S3 bucket for cluster backups"
-  value       = var.create_backup_bucket ? aws_s3_bucket.cluster_backups[0].arn : null
-}
-
-# Kubernetes Outputs
+# Kubernetes Namespaces Outputs
 output "kubernetes_namespaces" {
   description = "List of created Kubernetes namespaces"
-  value       = [for ns in kubernetes_namespace.namespaces : ns.metadata[0].name]
+  value       = [for k, v in kubernetes_namespace.namespaces : v.metadata[0].name]
+}
+
+# Helm Releases Outputs
+output "aws_load_balancer_controller_status" {
+  description = "Status of the AWS Load Balancer Controller Helm release"
+  value       = var.install_aws_load_balancer_controller ? helm_release.aws_load_balancer_controller[0].status : null
+}
+
+output "cluster_autoscaler_status" {
+  description = "Status of the Cluster Autoscaler Helm release"
+  value       = var.install_cluster_autoscaler ? helm_release.cluster_autoscaler[0].status : null
+}
+
+output "metrics_server_status" {
+  description = "Status of the Metrics Server Helm release"
+  value       = var.install_metrics_server ? helm_release.metrics_server[0].status : null
+}
+
+# CloudWatch Alarms Outputs
+output "cpu_utilization_alarm_arn" {
+  description = "ARN of the CPU utilization CloudWatch alarm"
+  value       = var.create_alarms ? aws_cloudwatch_metric_alarm.cluster_cpu_utilization[0].arn : null
+}
+
+output "memory_utilization_alarm_arn" {
+  description = "ARN of the memory utilization CloudWatch alarm"
+  value       = var.create_alarms ? aws_cloudwatch_metric_alarm.cluster_memory_utilization[0].arn : null
 }
 
 # General Information
@@ -194,26 +189,9 @@ output "environment" {
 # kubectl Configuration
 output "kubectl_config" {
   description = "kubectl configuration commands"
-  value = <<-EOT
-    # Update kubeconfig
-    aws eks update-kubeconfig --region ${var.aws_region} --name ${module.eks_cluster.cluster_name}
-    
-    # Verify cluster access
-    kubectl get nodes
-    kubectl get pods --all-namespaces
-  EOT
-}
-
-# Helm Configuration
-output "helm_config" {
-  description = "Helm configuration commands"
-  value = <<-EOT
-    # Add Helm repositories
-    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-    helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
-    helm repo update
-    
-    # List installed charts
-    helm list --all-namespaces
-  EOT
+  value = {
+    update_kubeconfig = "aws eks update-kubeconfig --region ${var.aws_region} --name ${var.cluster_name}"
+    cluster_name      = var.cluster_name
+    cluster_endpoint  = module.eks_cluster.cluster_endpoint
+  }
 }

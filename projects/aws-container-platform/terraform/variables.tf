@@ -76,27 +76,9 @@ variable "cluster_endpoint_private_access" {
   default     = true
 }
 
-variable "cluster_endpoint_public_access_cidrs" {
-  description = "List of CIDR blocks which can access the Amazon EKS public API server endpoint"
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
-}
-
-variable "cluster_encryption_enabled" {
-  description = "Whether to enable EKS cluster encryption"
-  type        = bool
-  default     = true
-}
-
-variable "cluster_log_types" {
-  description = "A list of the desired control plane logging to enable"
-  type        = list(string)
-  default     = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
-}
-
 # Node Group Configuration
 variable "node_instance_types" {
-  description = "List of instance types for the node group"
+  description = "Instance types for the EKS managed node group"
   type        = list(string)
   default     = ["t3.medium"]
 }
@@ -107,24 +89,24 @@ variable "node_capacity_type" {
   default     = "ON_DEMAND"
   validation {
     condition     = contains(["ON_DEMAND", "SPOT"], var.node_capacity_type)
-    error_message = "Node capacity type must be ON_DEMAND or SPOT."
+    error_message = "Node capacity type must be either ON_DEMAND or SPOT."
   }
 }
 
 variable "node_min_size" {
-  description = "Minimum number of nodes in the node group"
+  description = "Minimum number of nodes in the EKS managed node group"
   type        = number
   default     = 1
 }
 
 variable "node_max_size" {
-  description = "Maximum number of nodes in the node group"
+  description = "Maximum number of nodes in the EKS managed node group"
   type        = number
   default     = 10
 }
 
 variable "node_desired_size" {
-  description = "Desired number of nodes in the node group"
+  description = "Desired number of nodes in the EKS managed node group"
   type        = number
   default     = 3
 }
@@ -135,145 +117,98 @@ variable "node_disk_size" {
   default     = 50
 }
 
-variable "node_ami_type" {
-  description = "Type of Amazon Machine Image (AMI) associated with the EKS Node Group"
+variable "node_disk_type" {
+  description = "Disk type for worker nodes"
   type        = string
-  default     = "AL2_x86_64"
-  validation {
-    condition = contains([
-      "AL2_x86_64", "AL2_x86_64_GPU", "AL2_ARM_64", "CUSTOM", "BOTTLEROCKET_ARM_64", "BOTTLEROCKET_x86_64"
-    ], var.node_ami_type)
-    error_message = "Node AMI type must be a valid EKS AMI type."
-  }
+  default     = "gp3"
 }
 
-variable "node_remote_access_enabled" {
-  description = "Whether to enable remote access to nodes"
-  type        = bool
-  default     = false
-}
-
-variable "node_ssh_key_name" {
-  description = "EC2 Key Pair name for SSH access to nodes"
-  type        = string
-  default     = ""
-}
-
-variable "node_ssh_cidr_blocks" {
-  description = "List of CIDR blocks for SSH access to nodes"
+# Spot Instance Configuration
+variable "spot_instance_types" {
+  description = "Instance types for the spot node group"
   type        = list(string)
-  default     = ["0.0.0.0/0"]
+  default     = ["t3.medium", "t3.large", "t3.xlarge"]
 }
 
-variable "node_taints" {
-  description = "List of Kubernetes taints to apply to the node group"
-  type = list(object({
-    key    = string
-    value  = string
-    effect = string
-  }))
-  default = []
+variable "spot_min_size" {
+  description = "Minimum number of nodes in the spot node group"
+  type        = number
+  default     = 0
+}
+
+variable "spot_max_size" {
+  description = "Maximum number of nodes in the spot node group"
+  type        = number
+  default     = 5
+}
+
+variable "spot_desired_size" {
+  description = "Desired number of nodes in the spot node group"
+  type        = number
+  default     = 0
 }
 
 # ECR Configuration
 variable "ecr_repositories" {
   description = "List of ECR repository names to create"
   type        = list(string)
-  default     = ["app", "nginx", "redis"]
+  default     = ["app", "api", "frontend", "worker"]
 }
 
 # Kubernetes Configuration
 variable "kubernetes_namespaces" {
   description = "List of Kubernetes namespaces to create"
   type        = list(string)
-  default     = ["default", "kube-system", "monitoring", "logging"]
+  default     = ["default", "kube-system", "kube-public", "kube-node-lease", "monitoring", "logging", "ingress-nginx"]
 }
 
-variable "kubernetes_config_maps" {
-  description = "Map of Kubernetes ConfigMaps to create"
-  type = map(object({
-    name      = string
-    namespace = string
-    labels    = map(string)
-    data      = map(string)
-  }))
-  default = {}
-}
-
-variable "kubernetes_secrets" {
-  description = "Map of Kubernetes Secrets to create"
-  type = map(object({
-    name      = string
-    namespace = string
-    labels    = map(string)
-    data      = map(string)
-    type      = string
-  }))
-  default = {}
-}
-
-# Helm Charts Configuration
-variable "helm_charts" {
-  description = "Map of Helm charts to install"
-  type = map(object({
-    name             = string
-    repository       = string
-    chart            = string
-    version          = string
-    namespace        = string
-    create_namespace = bool
-    wait             = bool
-    timeout          = number
-    values           = list(string)
-  }))
-  default = {
-    nginx_ingress = {
-      name             = "nginx-ingress"
-      repository       = "https://kubernetes.github.io/ingress-nginx"
-      chart            = "ingress-nginx"
-      version          = "4.7.1"
-      namespace        = "ingress-nginx"
-      create_namespace = true
-      wait             = true
-      timeout          = 300
-      values           = []
-    }
-    metrics_server = {
-      name             = "metrics-server"
-      repository       = "https://kubernetes-sigs.github.io/metrics-server/"
-      chart            = "metrics-server"
-      version          = "3.10.0"
-      namespace        = "kube-system"
-      create_namespace = false
-      wait             = true
-      timeout          = 300
-      values           = []
-    }
-  }
-}
-
-# Monitoring Configuration
-variable "create_alarms" {
-  description = "Whether to create CloudWatch alarms"
+# Helm Chart Configuration
+variable "install_aws_load_balancer_controller" {
+  description = "Whether to install AWS Load Balancer Controller"
   type        = bool
   default     = true
 }
 
-variable "alarm_sns_topic_arn" {
-  description = "SNS topic ARN for alarm notifications"
+variable "aws_load_balancer_controller_version" {
+  description = "Version of AWS Load Balancer Controller"
   type        = string
-  default     = null
+  default     = "1.6.2"
 }
 
+variable "install_cluster_autoscaler" {
+  description = "Whether to install Cluster Autoscaler"
+  type        = bool
+  default     = true
+}
+
+variable "cluster_autoscaler_version" {
+  description = "Version of Cluster Autoscaler"
+  type        = string
+  default     = "9.29.0"
+}
+
+variable "install_metrics_server" {
+  description = "Whether to install Metrics Server"
+  type        = bool
+  default     = true
+}
+
+variable "metrics_server_version" {
+  description = "Version of Metrics Server"
+  type        = string
+  default     = "3.10.0"
+}
+
+# Logging Configuration
 variable "log_retention_days" {
   description = "Number of days to retain CloudWatch logs"
   type        = number
   default     = 30
 }
 
-# Backup Configuration
-variable "create_backup_bucket" {
-  description = "Whether to create S3 bucket for cluster backups"
+# Monitoring Configuration
+variable "create_alarms" {
+  description = "Whether to create CloudWatch alarms"
   type        = bool
   default     = true
 }
