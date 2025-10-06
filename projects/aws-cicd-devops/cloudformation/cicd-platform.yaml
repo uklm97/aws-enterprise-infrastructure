@@ -1,0 +1,856 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'AWS CI/CD & DevOps Platform - Complete infrastructure for CodePipeline, CodeBuild, and CodeDeploy'
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: 'aws-cicd-devops'
+    Description: 'Name of the project'
+  
+  Environment:
+    Type: String
+    Default: 'production'
+    AllowedValues: ['dev', 'staging', 'production']
+    Description: 'Environment name'
+  
+  SourceProvider:
+    Type: String
+    Default: 'CodeCommit'
+    AllowedValues: ['CodeCommit', 'GitHub', 'S3']
+    Description: 'Source provider for CodePipeline'
+  
+  SourceRepository:
+    Type: String
+    Default: ''
+    Description: 'Name of the source repository (for CodeCommit)'
+  
+  SourceBranch:
+    Type: String
+    Default: 'main'
+    Description: 'Source branch name'
+  
+  GitHubOwner:
+    Type: String
+    Default: ''
+    Description: 'GitHub repository owner'
+  
+  GitHubRepo:
+    Type: String
+    Default: ''
+    Description: 'GitHub repository name'
+  
+  GitHubToken:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: 'GitHub OAuth token'
+  
+  BuildComputeType:
+    Type: String
+    Default: 'BUILD_GENERAL1_SMALL'
+    AllowedValues: ['BUILD_GENERAL1_SMALL', 'BUILD_GENERAL1_MEDIUM', 'BUILD_GENERAL1_LARGE', 'BUILD_GENERAL1_2XLARGE']
+    Description: 'CodeBuild compute type'
+  
+  BuildImage:
+    Type: String
+    Default: 'aws/codebuild/amazonlinux2-x86_64-standard:3.0'
+    Description: 'CodeBuild image'
+  
+  BuildTimeout:
+    Type: Number
+    Default: 60
+    MinValue: 5
+    MaxValue: 480
+    Description: 'CodeBuild timeout in minutes'
+  
+  BuildPrivilegedMode:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: 'Whether to enable privileged mode for CodeBuild'
+  
+  BuildspecFile:
+    Type: String
+    Default: 'buildspec.yml'
+    Description: 'Buildspec file name'
+  
+  CreateTestProject:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: 'Whether to create test CodeBuild project'
+  
+  TestComputeType:
+    Type: String
+    Default: 'BUILD_GENERAL1_SMALL'
+    AllowedValues: ['BUILD_GENERAL1_SMALL', 'BUILD_GENERAL1_MEDIUM', 'BUILD_GENERAL1_LARGE', 'BUILD_GENERAL1_2XLARGE']
+    Description: 'Test CodeBuild compute type'
+  
+  TestImage:
+    Type: String
+    Default: 'aws/codebuild/amazonlinux2-x86_64-standard:3.0'
+    Description: 'Test CodeBuild image'
+  
+  TestTimeout:
+    Type: Number
+    Default: 30
+    MinValue: 5
+    MaxValue: 480
+    Description: 'Test CodeBuild timeout in minutes'
+  
+  TestBuildspecFile:
+    Type: String
+    Default: 'test-buildspec.yml'
+    Description: 'Test buildspec file name'
+  
+  CreateCodeDeployApp:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: 'Whether to create CodeDeploy application'
+  
+  CodeDeployComputePlatform:
+    Type: String
+    Default: 'Server'
+    AllowedValues: ['Server', 'Lambda', 'ECS']
+    Description: 'CodeDeploy compute platform'
+  
+  CreateDeploymentGroup:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: 'Whether to create deployment group'
+  
+  CodeDeployConfigName:
+    Type: String
+    Default: 'CodeDeployDefault.OneAtATime'
+    Description: 'CodeDeploy deployment configuration name'
+  
+  CreatePipeline:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: 'Whether to create CodePipeline'
+  
+  CreateAlarms:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: 'Whether to create CloudWatch alarms'
+  
+  AlarmSNSTopicArn:
+    Type: String
+    Default: ''
+    Description: 'SNS topic ARN for alarm notifications'
+
+Conditions:
+  IsCodeCommit: !Equals [!Ref SourceProvider, 'CodeCommit']
+  IsGitHub: !Equals [!Ref SourceProvider, 'GitHub']
+  IsS3: !Equals [!Ref SourceProvider, 'S3']
+  CreateTest: !Equals [!Ref CreateTestProject, 'true']
+  CreateCodeDeploy: !Equals [!Ref CreateCodeDeployApp, 'true']
+  CreateDeploymentGroup: !And [!Equals [!Ref CreateCodeDeployApp, 'true'], !Equals [!Ref CreateDeploymentGroup, 'true']]
+  CreatePipeline: !Equals [!Ref CreatePipeline, 'true']
+  CreateAlarms: !Equals [!Ref CreateAlarms, 'true']
+  HasAlarmSNSTopic: !Not [!Equals [!Ref AlarmSNSTopicArn, '']]
+
+Resources:
+  # S3 Bucket for CodePipeline artifacts
+  PipelineArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-pipeline-artifacts-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldArtifacts
+            Status: Enabled
+            ExpirationInDays: 30
+            NoncurrentVersionExpirationInDays: 7
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-pipeline-artifacts'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: 'codepipeline-artifacts'
+
+  # S3 Bucket for CodeBuild cache
+  BuildCacheBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${ProjectName}-build-cache-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-build-cache'
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Purpose
+          Value: 'codebuild-cache'
+
+  # CloudWatch Log Groups
+  PipelineLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/codepipeline/${ProjectName}'
+      RetentionInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-pipeline-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/codebuild/${ProjectName}'
+      RetentionInDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-build-logs'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # IAM Roles
+  CodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-codepipeline-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codepipeline.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodePipelineServiceRole
+      Policies:
+        - PolicyName: PipelinePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:GetBucketVersioning
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource:
+                  - !GetAtt PipelineArtifactsBucket.Arn
+                  - !Sub '${PipelineArtifactsBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - codecommit:CancelUploadArchive
+                  - codecommit:GetBranch
+                  - codecommit:GetCommit
+                  - codecommit:GetRepository
+                  - codecommit:GetUploadArchiveStatus
+                  - codecommit:UploadArchive
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codebuild:BatchGetBuilds
+                  - codebuild:BatchGetProjects
+                  - codebuild:StartBuild
+                  - codebuild:StopBuild
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - codedeploy:CreateDeployment
+                  - codedeploy:GetApplication
+                  - codedeploy:GetApplicationRevision
+                  - codedeploy:GetDeployment
+                  - codedeploy:GetDeploymentConfig
+                  - codedeploy:RegisterApplicationRevision
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - iam:PassRole
+                Resource:
+                  - !GetAtt CodeBuildRole.Arn
+                  - !GetAtt CodeDeployRole.Arn
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-codepipeline-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-codebuild-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
+      Policies:
+        - PolicyName: BuildPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !GetAtt BuildLogGroup.Arn
+                  - !Sub '${BuildLogGroup.Arn}:*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                Resource:
+                  - !GetAtt PipelineArtifactsBucket.Arn
+                  - !Sub '${PipelineArtifactsBucket.Arn}/*'
+                  - !GetAtt BuildCacheBucket.Arn
+                  - !Sub '${BuildCacheBucket.Arn}/*'
+              - Effect: Allow
+                Action:
+                  - ecr:GetAuthorizationToken
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:BatchGetImage
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameters
+                  - ssm:GetParameter
+                  - ssm:GetParametersByPath
+                Resource: !Sub 'arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ProjectName}/*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-codebuild-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  CodeDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${ProjectName}-codedeploy-role'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSCodeDeployRole
+      Policies:
+        - PolicyName: DeployPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - ec2:CreateTags
+                  - ec2:DescribeInstances
+                  - ec2:DescribeInstanceStatus
+                  - ec2:DescribeTags
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - autoscaling:CompleteLifecycleAction
+                  - autoscaling:DeleteLifecycleHook
+                  - autoscaling:DescribeAutoScalingGroups
+                  - autoscaling:DescribeLifecycleHooks
+                  - autoscaling:PutLifecycleHook
+                  - autoscaling:RecordLifecycleActionHeartbeat
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - elasticloadbalancing:DescribeLoadBalancers
+                  - elasticloadbalancing:DescribeTargetGroups
+                  - elasticloadbalancing:DescribeTargetHealth
+                  - elasticloadbalancing:ModifyListener
+                  - elasticloadbalancing:ModifyTargetGroup
+                  - elasticloadbalancing:SetIpAddressType
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !GetAtt PipelineArtifactsBucket.Arn
+                  - !Sub '${PipelineArtifactsBucket.Arn}/*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-codedeploy-role'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CodeBuild Projects
+  BuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: !Sub '${ProjectName}-build'
+      Description: !Sub 'Build project for ${ProjectName}'
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      TimeoutInMinutes: !Ref BuildTimeout
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: !Ref BuildComputeType
+        Image: !Ref BuildImage
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: !Ref BuildPrivilegedMode
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Ref BuildspecFile
+      Cache:
+        Type: S3
+        Location: !GetAtt BuildCacheBucket.Arn
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref BuildLogGroup
+          StreamName: build
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-build'
+        - Key: Environment
+          Value: !Ref Environment
+
+  TestProject:
+    Type: AWS::CodeBuild::Project
+    Condition: CreateTest
+    Properties:
+      Name: !Sub '${ProjectName}-test'
+      Description: !Sub 'Test project for ${ProjectName}'
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+      TimeoutInMinutes: !Ref TestTimeout
+      Artifacts:
+        Type: CODEPIPELINE
+      Environment:
+        Type: LINUX_CONTAINER
+        ComputeType: !Ref TestComputeType
+        Image: !Ref TestImage
+        ImagePullCredentialsType: CODEBUILD
+        PrivilegedMode: !Ref BuildPrivilegedMode
+        EnvironmentVariables:
+          - Name: AWS_DEFAULT_REGION
+            Value: !Ref AWS::Region
+          - Name: AWS_ACCOUNT_ID
+            Value: !Ref AWS::AccountId
+      Source:
+        Type: CODEPIPELINE
+        BuildSpec: !Ref TestBuildspecFile
+      Cache:
+        Type: S3
+        Location: !GetAtt BuildCacheBucket.Arn
+      LogsConfig:
+        CloudWatchLogs:
+          GroupName: !Ref BuildLogGroup
+          StreamName: test
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-test'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CodeDeploy Application
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Condition: CreateCodeDeploy
+    Properties:
+      ApplicationName: !Ref ProjectName
+      ComputePlatform: !Ref CodeDeployComputePlatform
+      Tags:
+        - Key: Name
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CodeDeploy Deployment Group
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Condition: CreateDeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: !Sub '${ProjectName}-deployment-group'
+      ServiceRoleArn: !GetAtt CodeDeployRole.Arn
+      DeploymentConfigName: !Ref CodeDeployConfigName
+      Ec2TagFilters:
+        - Type: KEY_AND_VALUE
+          Key: Environment
+          Value: !Ref Environment
+      AutoRollbackConfiguration:
+        Enabled: true
+        Events:
+          - DEPLOYMENT_FAILURE
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-deployment-group'
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CodePipeline
+  CodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Condition: CreatePipeline
+    Properties:
+      Name: !Ref ProjectName
+      RoleArn: !GetAtt CodePipelineRole.Arn
+      ArtifactStore:
+        Type: S3
+        Location: !Ref PipelineArtifactsBucket
+      Stages:
+        - Name: Source
+          Actions:
+            - Name: Source
+              ActionTypeId:
+                Category: Source
+                Owner: AWS
+                Provider: !Ref SourceProvider
+                Version: '1'
+              Configuration: !If
+                - IsCodeCommit
+                - RepositoryName: !Ref SourceRepository
+                  BranchName: !Ref SourceBranch
+                - !If
+                  - IsGitHub
+                  - Owner: !Ref GitHubOwner
+                    Repo: !Ref GitHubRepo
+                    Branch: !Ref SourceBranch
+                    OAuthToken: !Ref GitHubToken
+                  - !Ref 'AWS::NoValue'
+              OutputArtifacts:
+                - Name: source_output
+        - Name: Build
+          Actions:
+            - Name: Build
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              InputArtifacts:
+                - Name: source_output
+              OutputArtifacts:
+                - Name: build_output
+              Configuration:
+                ProjectName: !Ref BuildProject
+        - Name: Test
+          Condition: CreateTest
+          Actions:
+            - Name: Test
+              ActionTypeId:
+                Category: Test
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              InputArtifacts:
+                - Name: build_output
+              OutputArtifacts:
+                - Name: test_output
+              Configuration:
+                ProjectName: !Ref TestProject
+        - Name: Deploy
+          Condition: CreateCodeDeploy
+          Actions:
+            - Name: Deploy
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CodeDeploy
+                Version: '1'
+              InputArtifacts:
+                - Name: build_output
+              Configuration:
+                ApplicationName: !Ref CodeDeployApplication
+                DeploymentGroupName: !GetAtt CodeDeployDeploymentGroup.DeploymentGroupName
+      Tags:
+        - Key: Name
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # CloudWatch Alarms
+  PipelineFailuresAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateAlarms
+    Properties:
+      AlarmName: !Sub '${ProjectName}-pipeline-failures'
+      AlarmDescription: 'This metric monitors pipeline failures'
+      MetricName: FailedExecutions
+      Namespace: AWS/CodePipeline
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: PipelineName
+          Value: !Ref ProjectName
+      AlarmActions: !If
+        - HasAlarmSNSTopic
+        - [!Ref AlarmSNSTopicArn]
+        - !Ref 'AWS::NoValue'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-pipeline-failures'
+        - Key: Environment
+          Value: !Ref Environment
+
+  BuildFailuresAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Condition: CreateAlarms
+    Properties:
+      AlarmName: !Sub '${ProjectName}-build-failures'
+      AlarmDescription: 'This metric monitors build failures'
+      MetricName: FailedBuilds
+      Namespace: AWS/CodeBuild
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 2
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: ProjectName
+          Value: !Ref BuildProject
+      AlarmActions: !If
+        - HasAlarmSNSTopic
+        - [!Ref AlarmSNSTopicArn]
+        - !Ref 'AWS::NoValue'
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-build-failures'
+        - Key: Environment
+          Value: !Ref Environment
+
+Outputs:
+  PipelineArtifactsBucket:
+    Description: 'S3 bucket for CodePipeline artifacts'
+    Value: !Ref PipelineArtifactsBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineArtifactsBucket'
+
+  PipelineArtifactsBucketArn:
+    Description: 'ARN of the S3 bucket for CodePipeline artifacts'
+    Value: !GetAtt PipelineArtifactsBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineArtifactsBucketArn'
+
+  BuildCacheBucket:
+    Description: 'S3 bucket for CodeBuild cache'
+    Value: !Ref BuildCacheBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BuildCacheBucket'
+
+  BuildCacheBucketArn:
+    Description: 'ARN of the S3 bucket for CodeBuild cache'
+    Value: !GetAtt BuildCacheBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BuildCacheBucketArn'
+
+  CodePipelineRoleArn:
+    Description: 'ARN of the CodePipeline IAM role'
+    Value: !GetAtt CodePipelineRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CodePipelineRoleArn'
+
+  CodeBuildRoleArn:
+    Description: 'ARN of the CodeBuild IAM role'
+    Value: !GetAtt CodeBuildRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CodeBuildRoleArn'
+
+  CodeDeployRoleArn:
+    Description: 'ARN of the CodeDeploy IAM role'
+    Value: !GetAtt CodeDeployRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-CodeDeployRoleArn'
+
+  PipelineLogGroupName:
+    Description: 'Name of the CodePipeline CloudWatch log group'
+    Value: !Ref PipelineLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineLogGroupName'
+
+  PipelineLogGroupArn:
+    Description: 'ARN of the CodePipeline CloudWatch log group'
+    Value: !GetAtt PipelineLogGroup.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineLogGroupArn'
+
+  BuildLogGroupName:
+    Description: 'Name of the CodeBuild CloudWatch log group'
+    Value: !Ref BuildLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-BuildLogGroupName'
+
+  BuildLogGroupArn:
+    Description: 'ARN of the CodeBuild CloudWatch log group'
+    Value: !GetAtt BuildLogGroup.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BuildLogGroupArn'
+
+  BuildProjectName:
+    Description: 'Name of the CodeBuild project'
+    Value: !Ref BuildProject
+    Export:
+      Name: !Sub '${AWS::StackName}-BuildProjectName'
+
+  BuildProjectArn:
+    Description: 'ARN of the CodeBuild project'
+    Value: !GetAtt BuildProject.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BuildProjectArn'
+
+  TestProjectName:
+    Description: 'Name of the test CodeBuild project'
+    Value: !If
+      - CreateTest
+      - !Ref TestProject
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-TestProjectName'
+
+  TestProjectArn:
+    Description: 'ARN of the test CodeBuild project'
+    Value: !If
+      - CreateTest
+      - !GetAtt TestProject.Arn
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-TestProjectArn'
+
+  CodeDeployAppName:
+    Description: 'Name of the CodeDeploy application'
+    Value: !If
+      - CreateCodeDeploy
+      - !Ref CodeDeployApplication
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-CodeDeployAppName'
+
+  CodeDeployAppId:
+    Description: 'ID of the CodeDeploy application'
+    Value: !If
+      - CreateCodeDeploy
+      - !Ref CodeDeployApplication
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-CodeDeployAppId'
+
+  DeploymentGroupName:
+    Description: 'Name of the CodeDeploy deployment group'
+    Value: !If
+      - CreateDeploymentGroup
+      - !GetAtt CodeDeployDeploymentGroup.DeploymentGroupName
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-DeploymentGroupName'
+
+  DeploymentGroupId:
+    Description: 'ID of the CodeDeploy deployment group'
+    Value: !If
+      - CreateDeploymentGroup
+      - !Ref CodeDeployDeploymentGroup
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-DeploymentGroupId'
+
+  PipelineName:
+    Description: 'Name of the CodePipeline'
+    Value: !If
+      - CreatePipeline
+      - !Ref CodePipeline
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineName'
+
+  PipelineArn:
+    Description: 'ARN of the CodePipeline'
+    Value: !If
+      - CreatePipeline
+      - !GetAtt CodePipeline.Arn
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineArn'
+
+  PipelineFailuresAlarmName:
+    Description: 'Name of the pipeline failures CloudWatch alarm'
+    Value: !If
+      - CreateAlarms
+      - !Ref PipelineFailuresAlarm
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineFailuresAlarmName'
+
+  PipelineFailuresAlarmArn:
+    Description: 'ARN of the pipeline failures CloudWatch alarm'
+    Value: !If
+      - CreateAlarms
+      - !GetAtt PipelineFailuresAlarm.Arn
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-PipelineFailuresAlarmArn'
+
+  BuildFailuresAlarmName:
+    Description: 'Name of the build failures CloudWatch alarm'
+    Value: !If
+      - CreateAlarms
+      - !Ref BuildFailuresAlarm
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-BuildFailuresAlarmName'
+
+  BuildFailuresAlarmArn:
+    Description: 'ARN of the build failures CloudWatch alarm'
+    Value: !If
+      - CreateAlarms
+      - !GetAtt BuildFailuresAlarm.Arn
+      - !Ref 'AWS::NoValue'
+    Export:
+      Name: !Sub '${AWS::StackName}-BuildFailuresAlarmArn'
+
+  AWSRegion:
+    Description: 'AWS region where resources are created'
+    Value: !Ref AWS::Region
+    Export:
+      Name: !Sub '${AWS::StackName}-AWSRegion'
+
+  AWSAccountId:
+    Description: 'AWS account ID'
+    Value: !Ref AWS::AccountId
+    Export:
+      Name: !Sub '${AWS::StackName}-AWSAccountId'
+
+  ProjectName:
+    Description: 'Name of the project'
+    Value: !Ref ProjectName
+    Export:
+      Name: !Sub '${AWS::StackName}-ProjectName'
+
+  Environment:
+    Description: 'Environment name'
+    Value: !Ref Environment
+    Export:
+      Name: !Sub '${AWS::StackName}-Environment'

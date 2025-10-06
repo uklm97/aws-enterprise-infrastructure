@@ -1,0 +1,42 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Test phase started on `date`
+      - echo Installing test dependencies...
+      - pip install -r requirements.txt
+      - pip install pytest pytest-cov flake8
+      
+  build:
+    commands:
+      - echo Running unit tests...
+      - pytest tests/ --cov=src/ --cov-report=xml --cov-report=html
+      - echo Running linting...
+      - flake8 src/ --max-line-length=100 --exclude=__pycache__
+      - echo Running security scan...
+      - pip install bandit
+      - bandit -r src/ -f json -o bandit-report.json
+      
+  post_build:
+    commands:
+      - echo Test phase completed on `date`
+      - echo Test results:
+      - cat coverage.xml
+      - cat bandit-report.json
+      - echo Copying test reports...
+      - cp coverage.xml test-coverage.xml
+      - cp bandit-report.json security-report.json
+      - cp -r htmlcov/ test-coverage-html/
+
+artifacts:
+  files:
+    - test-coverage.xml
+    - security-report.json
+    - test-coverage-html/**/*
+  name: test-$(date +%Y-%m-%d)
+
+cache:
+  paths:
+    - '/root/.cache/pip/**/*'
+    - '/root/.cache/pytest/**/*'

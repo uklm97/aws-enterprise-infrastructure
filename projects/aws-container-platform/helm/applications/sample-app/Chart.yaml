@@ -1,0 +1,21 @@
+apiVersion: v2
+name: sample-app
+description: A Helm chart for sample application
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - sample
+  - app
+  - nginx
+home: https://github.com/aws-container-platform/sample-app
+sources:
+  - https://github.com/aws-container-platform/sample-app
+maintainers:
+  - name: AWS Container Platform Team
+    email: team@example.com
+dependencies:
+  - name: nginx-ingress
+    version: "4.0.0"
+    repository: "https://kubernetes.github.io/ingress-nginx"
+    condition: nginx-ingress.enabled
