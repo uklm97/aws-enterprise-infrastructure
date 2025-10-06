@@ -1,0 +1,48 @@
+# AWS Data & Analytics Platform - Terraform Variables Example
+# Copy this file to terraform.tfvars and update the values
+
+# General Configuration
+aws_region = "us-east-1"
+project_name = "aws-data-analytics"
+environment = "production"
+
+# Data Lake Configuration
+data_lake_bucket_name = "my-data-lake-bucket-123456789012"
+
+# VPC Configuration
+vpc_id = "vpc-12345678"
+
+# Redshift Configuration
+redshift_cluster_identifier = "data-analytics-cluster"
+redshift_database_name = "analytics"
+redshift_master_username = "admin"
+redshift_master_password = "YourSecurePassword123!"
+redshift_node_type = "dc2.large"
+redshift_cluster_type = "multi-node"
+redshift_number_of_nodes = 2
+redshift_skip_final_snapshot = false
+redshift_snapshot_retention_period = 7
+redshift_subnet_ids = ["subnet-12345678", "subnet-87654321"]
+redshift_allowed_cidr_blocks = ["10.0.0.0/8", "172.16.0.0/12"]
+
+# Kinesis Configuration
+kinesis_shard_count = 2
+kinesis_retention_period = 24
+
+# SageMaker Configuration
+create_sagemaker_notebook = true
+sagemaker_instance_type = "ml.t3.medium"
+sagemaker_volume_size = 20
+
+# Logging Configuration
+log_retention_days = 30
+
+# Monitoring Configuration
+create_alarms = true
+
+# Additional Tags
+additional_tags = {
+  "Owner" = "data-team"
+  "CostCenter" = "engineering"
+  "Backup" = "daily"
+}
