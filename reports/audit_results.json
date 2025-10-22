@@ -1,0 +1,50 @@
+{
+  "status": "success",
+  "duration": "0:00:00.006143",
+  "reports": {
+    "security": {
+      "error": "No module named 'boto3'"
+    },
+    "cost": {
+      "timestamp": "2025-10-22T13:11:48.776051",
+      "findings": [],
+      "optimization_opportunities": 0,
+      "summary": {
+        "monthly_spend_estimate": null,
+        "services_analyzed": []
+      }
+    },
+    "performance": {
+      "timestamp": "2025-10-22T13:11:48.776124",
+      "metrics_collected": [],
+      "findings": [],
+      "total_issues": 0
+    },
+    "compliance": {
+      "timestamp": "2025-10-22T13:11:48.776155",
+      "findings": [],
+      "compliance_score": 0,
+      "config_rules": [],
+      "security_hub_findings_count": 0
+    },
+    "infrastructure": {
+      "timestamp": "2025-10-22T13:11:48.776182",
+      "inventory": {
+        "ec2_instances": [],
+        "s3_buckets": []
+      },
+      "findings": []
+    }
+  },
+  "summary": {
+    "total_findings": 0,
+    "critical_findings": 0,
+    "high_findings": 0,
+    "medium_findings": 0,
+    "low_findings": 0,
+    "compliance_score": 0,
+    "cost_optimization_opportunities": 0,
+    "security_issues": 0,
+    "performance_issues": 0
+  }
+}

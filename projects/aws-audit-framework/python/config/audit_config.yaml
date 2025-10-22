@@ -1,0 +1,13 @@
+aws_region: us-east-1
+aws_profile: null
+
+audit_modules:
+  security: true
+  cost: true
+  performance: true
+  compliance: true
+  infrastructure: true
+
+reporting:
+  output_dir: reports
+  templates_dir: null

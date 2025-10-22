@@ -19,12 +19,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
-import boto3
-import botocore
-from botocore.exceptions import ClientError, NoCredentialsError
-
-# Import audit modules
-from security_audit import SecurityAuditor
+# Import audit modules (lazy import SecurityAuditor to avoid hard dependency on boto3 at import time)
 from cost_audit import CostAuditor
 from performance_audit import PerformanceAuditor
 from compliance_audit import ComplianceAuditor
@@ -142,6 +137,8 @@ class AWSAuditFramework:
         self.logger.info("Starting security audit")
         
         try:
+            # Lazy import to allow running without boto3 for other modules
+            from security_audit import SecurityAuditor  # type: ignore
             security_auditor = SecurityAuditor(self.clients, self.config)
             self.reports['security'] = security_auditor.run_audit()
             

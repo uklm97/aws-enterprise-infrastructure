@@ -100,7 +100,9 @@ class InstanceScheduler:
                     'timezone': 'UTC'
                 },
                 'weekend_shutdown': True,
-                'holiday_shutdown': True
+                'holiday_shutdown': True,
+                'holidays': [],  # List of YYYY-MM-DD strings
+                'holiday_check_time': '08:00'
             },
             'instance_tags': {
                 'start_tag': 'AutoStart',
@@ -251,6 +253,27 @@ class InstanceScheduler:
         logger.info("Performing holiday shutdown")
         self.stop_instances('HolidayShutdown', 'true')
     
+    def _is_today_holiday(self) -> bool:
+        """Return True if today is in configured holidays (YYYY-MM-DD)."""
+        try:
+            schedules = self.config.get('schedules', {})
+            holidays = set(schedules.get('holidays', []) or [])
+            today_str = datetime.now().strftime('%Y-%m-%d')
+            return today_str in holidays
+        except Exception:
+            return False
+
+    def check_holiday_and_shutdown(self):
+        """Check if today is a holiday and trigger shutdown if so."""
+        try:
+            if self._is_today_holiday():
+                logger.info("Today is a configured holiday. Triggering holiday shutdown.")
+                self.holiday_shutdown()
+            else:
+                logger.info("Today is not a configured holiday. No holiday shutdown performed.")
+        except Exception as e:
+            logger.error(f"Error during holiday check: {str(e)}")
+    
     def send_notification(self, subject: str, message: str):
         """
         Send notification via SNS.
@@ -340,10 +363,10 @@ class InstanceScheduler:
                 schedule.every().friday.at('18:00').do(self.weekend_shutdown)
                 schedule.every().monday.at('08:00').do(self.start_business_hours)
             
-            # Holiday shutdown (simplified - you can add holiday calendar)
+            # Holiday shutdown
             if schedules.get('holiday_shutdown', True):
-                # This is a simplified version - you can integrate with holiday APIs
-                pass
+                holiday_check_time = schedules.get('holiday_check_time', '08:00')
+                schedule.every().day.at(holiday_check_time).do(self.check_holiday_and_shutdown)
             
             # Daily metrics publishing
             schedule.every().day.at('00:00').do(self.publish_metrics)
