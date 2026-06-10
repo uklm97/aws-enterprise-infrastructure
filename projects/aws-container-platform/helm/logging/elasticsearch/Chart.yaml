@@ -1,0 +1,22 @@
+apiVersion: v2
+name: elasticsearch
+description: A Helm chart for Elasticsearch logging stack
+type: application
+version: 0.1.0
+appVersion: "8.8.0"
+keywords:
+  - elasticsearch
+  - logging
+  - search
+  - analytics
+home: https://www.elastic.co/elasticsearch/
+sources:
+  - https://github.com/elastic/elasticsearch
+maintainers:
+  - name: AWS Container Platform Team
+    email: team@example.com
+dependencies:
+  - name: elasticsearch
+    version: "19.5.0"
+    repository: "https://helm.elastic.co"
+    condition: elasticsearch.enabled

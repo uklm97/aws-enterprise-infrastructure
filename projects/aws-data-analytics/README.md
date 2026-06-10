@@ -1,139 +1,152 @@
 # AWS Data & Analytics Platform
 
-A comprehensive AWS data and analytics platform that provides big data infrastructure, ETL pipelines, real-time streaming, data warehousing, and business intelligence solutions. This project implements modern data architecture with scalability, performance, and operational excellence.
+A comprehensive AWS-based data analytics platform that provides end-to-end data processing capabilities including data ingestion, storage, processing, analytics, and machine learning.
 
-## 🎯 Overview
+## Architecture Overview
 
-This project provides a complete data and analytics solution including:
+The platform consists of the following key components:
 
-- **Data Lake Architecture** - S3-based data lake with Glue catalog
-- **ETL Pipelines** - Automated data processing with Step Functions
-- **Real-time Streaming** - Kinesis-based real-time data processing
-- **Data Warehouse** - Redshift-based analytics warehouse
-- **Business Intelligence** - Automated BI dashboards and reporting
-- **Machine Learning** - SageMaker integration for ML workflows
-- **Data Governance** - Data quality, lineage, and compliance
+### Data Ingestion
+- **Amazon Kinesis Data Streams**: Real-time data streaming
+- **Amazon Kinesis Data Firehose**: Data delivery to S3
+- **Amazon S3**: Data lake storage with lifecycle policies
 
-## 🏗️ Architecture
+### Data Storage
+- **Amazon S3 Data Lake**: Centralized data storage with zones (raw, processed, curated)
+- **Amazon Redshift**: Data warehouse for analytics
+- **AWS Glue Data Catalog**: Metadata management
 
-### Data Platform Components
-```
-AWS Data & Analytics Platform
-├── Data Ingestion
-│   ├── Kinesis Data Streams
-│   ├── Kinesis Data Firehose
-│   ├── API Gateway
-│   └── IoT Core
-├── Data Storage
-│   ├── S3 Data Lake
-│   ├── Redshift Data Warehouse
-│   ├── DynamoDB Operational Store
-│   └── RDS Transactional Store
-├── Data Processing
-│   ├── Glue ETL Jobs
-│   ├── Lambda Functions
-│   ├── EMR Clusters
-│   └── Step Functions
-├── Analytics & ML
-│   ├── SageMaker Notebooks
-│   ├── QuickSight Dashboards
-│   ├── Athena Queries
-│   └── ML Pipelines
-├── Data Governance
-│   ├── Lake Formation
-│   ├── Glue Data Catalog
-│   ├── Data Quality
-│   └── Compliance
-└── Monitoring
-    ├── CloudWatch Metrics
-    ├── Data Pipeline Monitoring
-    ├── Performance Analytics
-    └── Cost Optimization
-```
+### Data Processing
+- **AWS Glue**: ETL jobs and data transformation
+- **AWS Step Functions**: Workflow orchestration
+- **Amazon EMR**: Big data processing (optional)
 
-## 📁 Project Structure
+### Analytics & ML
+- **Amazon SageMaker**: Machine learning platform
+- **Amazon QuickSight**: Business intelligence and visualization
+- **Amazon Redshift**: SQL analytics and reporting
+
+### Monitoring & Security
+- **Amazon CloudWatch**: Monitoring and logging
+- **AWS KMS**: Encryption key management
+- **AWS IAM**: Access control and permissions
+
+## Project Structure
 
 ```
 aws-data-analytics/
-├── README.md                           # This documentation
-├── python/                             # Python data automation
-│   ├── data_ingestion/                 # Data ingestion automation
-│   ├── etl_pipelines/                  # ETL pipeline automation
-│   ├── streaming/                      # Real-time streaming
-│   ├── analytics/                      # Analytics automation
-│   ├── ml_pipelines/                   # ML pipeline automation
-│   └── monitoring/                     # Data monitoring
+├── README.md                           # This file
+├── requirements.txt                    # Python dependencies
+├── cloudformation/                     # CloudFormation templates
+│   └── data-analytics-platform.json   # Main infrastructure template
 ├── terraform/                          # Terraform infrastructure
-│   ├── main.tf                        # Main Terraform configuration
-│   ├── modules/                       # Terraform modules
-│   │   ├── data_lake/                 # Data lake module
-│   │   ├── etl_pipelines/             # ETL module
-│   │   ├── streaming/                 # Streaming module
-│   │   ├── warehouse/                 # Data warehouse module
-│   │   └── analytics/                 # Analytics module
-│   └── examples/                      # Example configurations
-├── glue/                              # AWS Glue configurations
-│   ├── jobs/                          # Glue ETL jobs
-│   ├── crawlers/                      # Data crawlers
-│   └── scripts/                       # Glue scripts
-├── step-functions/                    # Step Functions workflows
-│   ├── etl-workflows/                 # ETL workflows
-│   ├── ml-workflows/                  # ML workflows
-│   └── data-quality/                  # Data quality workflows
-├── kinesis/                           # Kinesis configurations
-│   ├── streams/                       # Data streams
-│   ├── firehose/                      # Data firehose
-│   └── analytics/                     # Kinesis analytics
-├── redshift/                          # Redshift configurations
-│   ├── schemas/                       # Database schemas
-│   ├── queries/                       # SQL queries
-│   └── optimizations/                 # Performance optimizations
-├── quicksight/                        # QuickSight dashboards
-│   ├── dashboards/                    # Dashboard definitions
-│   ├── datasets/                      # Dataset configurations
-│   └── analyses/                      # Analysis configurations
-├── sagemaker/                         # SageMaker configurations
-│   ├── notebooks/                     # Jupyter notebooks
-│   ├── models/                        # ML models
-│   ├── endpoints/                     # Model endpoints
-│   └── pipelines/                     # ML pipelines
-├── config/                            # Configuration files
-│   ├── data_config.yaml               # Data platform configuration
-│   ├── etl_config.yaml                # ETL configuration
-│   ├── streaming_config.yaml          # Streaming configuration
-│   └── analytics_config.yaml          # Analytics configuration
-├── scripts/                           # Deployment and utility scripts
-│   ├── deploy_data_platform.sh        # Deploy data platform
-│   ├── setup_data_lake.sh             # Setup data lake
-│   ├── run_etl_pipeline.sh            # Run ETL pipeline
-│   └── create_dashboards.sh           # Create dashboards
-└── requirements.txt                   # Python dependencies
+│   ├── main.tf                        # Main configuration
+│   ├── variables.tf                   # Input variables
+│   ├── outputs.tf                     # Output values
+│   └── terraform.tfvars.example       # Example variables file
+├── python/                            # Python automation scripts
+│   ├── data_ingestion/                # Data ingestion modules
+│   │   └── data_lake_manager.py       # S3, Glue, Lake Formation management
+│   ├── etl_pipelines/                 # ETL pipeline modules
+│   │   └── etl_manager.py             # Glue jobs and Step Functions
+│   ├── streaming/                      # Streaming data modules
+│   │   └── kinesis_manager.py         # Kinesis Data Streams management
+│   ├── analytics/                      # Analytics modules
+│   │   └── redshift_manager.py        # Redshift cluster management
+│   └── ml/                            # Machine learning modules
+│       └── sagemaker_manager.py       # SageMaker operations
+└── scripts/                           # Deployment scripts
+    └── deploy_data_analytics.sh       # Platform deployment script
 ```
 
-## 🚀 Quick Start
+## Features
 
-### Prerequisites
-1. **AWS CLI** installed and configured
-2. **Python 3.8+** for data automation
-3. **Terraform** (for Terraform implementation)
-4. **jq** for JSON processing
-5. **AWS Permissions** - S3, Glue, Redshift, Kinesis, SageMaker permissions
+### Data Lake Management
+- Automated S3 bucket creation with proper security settings
+- Data zone organization (raw, processed, curated)
+- Lifecycle policies for cost optimization
+- Encryption at rest and in transit
 
-### Installation
+### Real-time Data Streaming
+- Kinesis Data Streams for real-time data ingestion
+- Kinesis Data Firehose for data delivery to S3
+- Configurable sharding and retention policies
+- Monitoring and alerting
 
-#### 1. Clone and Setup
+### ETL Pipelines
+- Glue job management for data transformation
+- Step Functions for workflow orchestration
+- Support for multiple data sources and formats
+- Error handling and retry mechanisms
+
+### Data Warehouse
+- Redshift cluster management
+- Automated backup and recovery
+- Query optimization and performance tuning
+- Integration with data lake
+
+### Machine Learning
+- SageMaker notebook instances for development
+- Model training and deployment capabilities
+- Integration with data lake and warehouse
+- MLOps workflows
+
+### Monitoring & Security
+- Comprehensive CloudWatch monitoring
+- Custom metrics and alarms
+- IAM roles and policies
+- KMS encryption
+
+## Prerequisites
+
+- AWS CLI configured with appropriate permissions
+- Terraform >= 1.0
+- Python 3.8+
+- Required Python packages (see requirements.txt)
+
+## Quick Start
+
+### 1. Clone and Setup
+
 ```bash
-cd projects/aws-data-analytics
+git clone <repository-url>
+cd aws-data-analytics
 pip install -r requirements.txt
 ```
 
-#### 2. Configure Data Platform
+### 2. Configure Variables
+
+Copy the example variables file and update with your values:
+
 ```bash
-cp config/data_config.yaml.example config/data_config.yaml
-# Edit configuration with your data requirements
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 ```
 
-#### 3. Deploy Infrastructure
+Edit `terraform/terraform.tfvars` with your specific configuration:
+
+```hcl
+aws_region = "us-east-1"
+project_name = "my-data-analytics"
+data_lake_bucket_name = "my-unique-bucket-name"
+vpc_id = "vpc-12345678"
+redshift_subnet_ids = ["subnet-12345678", "subnet-87654321"]
+redshift_master_password = "YourSecurePassword123!"
+```
+
+### 3. Deploy Infrastructure
+
+#### Option A: Using the Deployment Script
+
+```bash
+./scripts/deploy_data_analytics.sh \
+  --bucket-name my-data-lake-bucket \
+  --vpc-id vpc-12345678 \
+  --subnet-ids subnet-12345678,subnet-87654321 \
+  --password YourSecurePassword123!
+```
+
+#### Option B: Using Terraform Directly
+
 ```bash
 cd terraform
 terraform init
@@ -141,361 +154,210 @@ terraform plan
 terraform apply
 ```
 
-#### 4. Setup Data Lake
+### 4. Verify Deployment
+
+Check that all resources are created successfully:
+
 ```bash
-./scripts/setup_data_lake.sh
+aws s3 ls s3://your-data-lake-bucket
+aws kinesis list-streams
+aws redshift describe-clusters --cluster-identifier your-cluster-name
+aws sagemaker list-notebook-instances
 ```
 
-#### 5. Run ETL Pipeline
+## Usage Examples
+
+### Data Ingestion
+
+```python
+from python.data_ingestion.data_lake_manager import DataLakeManager
+
+# Initialize manager
+dlm = DataLakeManager()
+
+# Create data lake structure
+dlm.create_data_lake_structure("my-data-lake")
+
+# Ingest data
+dlm.ingest_data("s3://source-bucket/data.csv", "raw/2024/01/01/")
+```
+
+### Real-time Streaming
+
+```python
+from python.streaming.kinesis_manager import KinesisManager
+
+# Initialize manager
+km = KinesisManager()
+
+# Create stream
+km.create_stream("my-data-stream", shard_count=2)
+
+# Send data
+data = {"timestamp": "2024-01-01T00:00:00Z", "value": 100}
+km.put_record("my-data-stream", data)
+```
+
+### ETL Processing
+
+```python
+from python.etl_pipelines.etl_manager import ETLPipelineManager
+
+# Initialize manager
+etl = ETLPipelineManager()
+
+# Create Glue job
+job_config = {
+    'script_location': 's3://my-bucket/scripts/etl_script.py',
+    'max_capacity': 2.0,
+    'worker_type': 'Standard'
+}
+etl.create_glue_job('my-etl-job', job_config)
+```
+
+### Analytics
+
+```python
+from python.analytics.redshift_manager import RedshiftManager
+
+# Initialize manager
+rm = RedshiftManager()
+
+# Execute query
+results = rm.execute_query(
+    cluster_identifier="my-cluster",
+    query="SELECT * FROM sales WHERE date >= '2024-01-01'",
+    password="your-password"
+)
+```
+
+### Machine Learning
+
+```python
+from python.ml.sagemaker_manager import SageMakerManager
+
+# Initialize manager
+sm = SageMakerManager()
+
+# Create notebook instance
+notebook_config = {
+    'instance_name': 'ml-notebook',
+    'instance_type': 'ml.t3.medium'
+}
+sm.create_notebook_instance(notebook_config)
+```
+
+## Configuration
+
+### Environment Variables
+
+Set the following environment variables for configuration:
+
 ```bash
-./scripts/run_etl_pipeline.sh
+export AWS_REGION=us-east-1
+export AWS_PROFILE=your-profile
+export DATA_LAKE_BUCKET=your-data-lake-bucket
 ```
 
-## 🔧 Core Features
+### Terraform Variables
 
-### 1. Data Lake Architecture
-- **S3-based data lake** with organized data zones
-- **Glue Data Catalog** for metadata management
-- **Lake Formation** for data governance
-- **Data quality** and validation
-- **Data lineage** tracking
+Key variables that can be customized:
 
-### 2. ETL Pipelines
-- **Glue ETL jobs** for data transformation
-- **Step Functions** for workflow orchestration
-- **Lambda functions** for serverless processing
-- **Data validation** and quality checks
-- **Error handling** and retry mechanisms
+- `aws_region`: AWS region for deployment
+- `project_name`: Project identifier
+- `data_lake_bucket_name`: S3 bucket for data lake
+- `redshift_node_type`: Redshift instance type
+- `kinesis_shard_count`: Number of Kinesis shards
+- `sagemaker_instance_type`: SageMaker notebook instance type
 
-### 3. Real-time Streaming
-- **Kinesis Data Streams** for real-time ingestion
-- **Kinesis Data Firehose** for batch delivery
-- **Kinesis Analytics** for stream processing
-- **Real-time dashboards** and monitoring
-- **Stream processing** with Lambda
+## Monitoring
 
-### 4. Data Warehouse
-- **Redshift cluster** for analytics
-- **Performance optimization** and tuning
-- **Data modeling** and schema design
-- **Query optimization** and monitoring
-- **Backup and recovery**
+### CloudWatch Dashboards
 
-### 5. Business Intelligence
-- **QuickSight dashboards** for visualization
-- **Automated reporting** and alerts
-- **Data exploration** and analysis
-- **Self-service analytics**
-- **Mobile BI** support
+The platform creates several CloudWatch dashboards:
 
-### 6. Machine Learning
-- **SageMaker notebooks** for ML development
-- **Automated ML pipelines**
-- **Model training** and deployment
-- **ML inference** endpoints
-- **Model monitoring** and drift detection
+- Data Lake Metrics: S3 storage and request metrics
+- Kinesis Metrics: Stream throughput and error rates
+- Redshift Metrics: Cluster performance and utilization
+- Glue Metrics: Job execution and success rates
 
-## 🛠️ Implementation Examples
+### Alarms
 
-### Python Implementation
+Key alarms are configured:
 
-#### Data Lake Manager
-```python
-# python/data_ingestion/data_lake_manager.py
-import boto3
-import json
-from typing import Dict, Any
+- Kinesis incoming records threshold
+- Redshift CPU utilization
+- Glue job failure rates
+- S3 storage costs
 
-class DataLakeManager:
-    """AWS Data Lake Manager for data ingestion and organization."""
-    
-    def __init__(self):
-        self.s3_client = boto3.client('s3')
-        self.glue_client = boto3.client('glue')
-        
-    def create_data_lake_structure(self, bucket_name: str):
-        """Create organized data lake structure."""
-        zones = ['raw', 'processed', 'curated', 'analytics']
-        
-        for zone in zones:
-            self.s3_client.put_object(
-                Bucket=bucket_name,
-                Key=f'{zone}/'
-            )
-            print(f"Created {zone} zone in data lake")
-    
-    def setup_glue_catalog(self, database_name: str):
-        """Setup Glue Data Catalog."""
-        try:
-            self.glue_client.create_database(
-                DatabaseInput={
-                    'Name': database_name,
-                    'Description': 'Data lake catalog database'
-                }
-            )
-            print(f"Created Glue database: {database_name}")
-        except Exception as e:
-            print(f"Database {database_name} already exists")
-```
+## Security
 
-#### ETL Pipeline Manager
-```python
-# python/etl_pipelines/etl_manager.py
-import boto3
-from typing import Dict, Any
+### IAM Roles
 
-class ETLPipelineManager:
-    """ETL Pipeline Manager for data processing."""
-    
-    def __init__(self):
-        self.glue_client = boto3.client('glue')
-        self.stepfunctions_client = boto3.client('stepfunctions')
-        
-    def create_glue_job(self, job_name: str, script_location: str):
-        """Create Glue ETL job."""
-        try:
-            response = self.glue_client.create_job(
-                Name=job_name,
-                Role='AWSGlueServiceRole',
-                Command={
-                    'Name': 'glueetl',
-                    'ScriptLocation': script_location
-                },
-                DefaultArguments={
-                    '--job-language': 'python',
-                    '--job-bookmark-option': 'job-bookmark-enable'
-                }
-            )
-            print(f"Created Glue job: {job_name}")
-            return response['Name']
-        except Exception as e:
-            print(f"Error creating Glue job: {str(e)}")
-            return None
-```
+The platform creates specific IAM roles for each service:
 
-### Terraform Implementation
+- `{project}-glue-crawler-role`: Glue crawler permissions
+- `{project}-firehose-role`: Firehose delivery permissions
+- `{project}-sagemaker-role`: SageMaker execution permissions
+- `{project}-redshift-role`: Redshift cluster permissions
 
-#### Data Lake Module
-```hcl
-# terraform/modules/data_lake/main.tf
-resource "aws_s3_bucket" "data_lake" {
-  bucket = var.bucket_name
-  
-  tags = {
-    Name        = var.bucket_name
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
+### Encryption
 
-resource "aws_s3_bucket_versioning" "data_lake" {
-  bucket = aws_s3_bucket.data_lake.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
+- S3 buckets encrypted with AES-256
+- Kinesis streams encrypted with KMS
+- Redshift clusters encrypted at rest
+- All data in transit encrypted with TLS
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "data_lake" {
-  bucket = aws_s3_bucket.data_lake.id
+## Cost Optimization
 
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
+### S3 Lifecycle Policies
 
-# Glue Database
-resource "aws_glue_catalog_database" "data_lake" {
-  name = "${var.project_name}-data-lake"
-  
-  tags = {
-    Name        = "${var.project_name}-data-lake"
-    Environment = var.environment
-  }
-}
-
-# Glue Crawler
-resource "aws_glue_crawler" "data_lake" {
-  name          = "${var.project_name}-crawler"
-  database_name = aws_glue_catalog_database.data_lake.name
-  role          = aws_iam_role.glue_role.arn
-
-  s3_target {
-    path = "s3://${aws_s3_bucket.data_lake.bucket}/raw/"
-  }
-
-  schedule = "cron(0 */6 * * ? *)"  # Every 6 hours
-
-  tags = {
-    Name        = "${var.project_name}-crawler"
-    Environment = var.environment
-  }
-}
-```
-
-#### Redshift Module
-```hcl
-# terraform/modules/warehouse/main.tf
-resource "aws_redshift_cluster" "main" {
-  cluster_identifier        = var.cluster_identifier
-  database_name            = var.database_name
-  master_username          = var.master_username
-  master_password          = var.master_password
-  node_type                = var.node_type
-  cluster_type             = var.cluster_type
-  number_of_nodes          = var.number_of_nodes
-  skip_final_snapshot      = true
-  automated_snapshot_retention_period = 7
-
-  tags = {
-    Name        = var.cluster_identifier
-    Environment = var.environment
-    Project     = var.project_name
-  }
-}
-
-resource "aws_redshift_subnet_group" "main" {
-  name       = "${var.cluster_identifier}-subnet-group"
-  subnet_ids = var.subnet_ids
-
-  tags = {
-    Name        = "${var.cluster_identifier}-subnet-group"
-    Environment = var.environment
-  }
-}
-```
-
-## 📊 Analytics Dashboard
-
-### Data Platform Dashboard
-```json
-{
-  "dashboard": {
-    "title": "Data Analytics Platform Overview",
-    "panels": [
-      {
-        "title": "Data Ingestion Rate",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "sum(rate(kinesis_records_put_records_total[5m]))",
-            "legendFormat": "Records/Second"
-          }
-        ]
-      },
-      {
-        "title": "ETL Job Success Rate",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "sum(rate(glue_job_runs_total{status=\"SUCCEEDED\"}[24h])) / sum(rate(glue_job_runs_total[24h])) * 100",
-            "legendFormat": "Success Rate %"
-          }
-        ]
-      },
-      {
-        "title": "Redshift Query Performance",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "histogram_quantile(0.95, sum(rate(redshift_query_duration_seconds_bucket[5m])) by (le))",
-            "legendFormat": "95th Percentile"
-          }
-        ]
-      }
-    ]
-  }
-}
-```
-
-## 🔒 Security Features
-
-### Data Security
-- **Encryption at rest** and in transit
-- **IAM roles** and policies
-- **VPC isolation** and security groups
-- **Data masking** and anonymization
-- **Access logging** and audit trails
-
-### Compliance
-- **GDPR compliance** for data privacy
-- **Data retention** policies
-- **Data lineage** tracking
-- **Audit reporting** and monitoring
-- **Data quality** validation
-
-## 📈 Performance Optimization
-
-### Data Lake Optimization
-- **Partitioning** strategies for S3
-- **Compression** for storage efficiency
-- **Data lifecycle** management
-- **Cost optimization** with storage classes
-- **Performance tuning** for queries
+- Move data to IA after 30 days
+- Move to Glacier after 90 days
+- Move to Deep Archive after 365 days
 
 ### Redshift Optimization
-- **Distribution keys** for data distribution
-- **Sort keys** for query performance
-- **Compression** encoding
-- **Vacuum** and analyze operations
-- **Query optimization** and monitoring
 
-## 🔄 Data Pipeline Workflows
+- Automated snapshot retention
+- Pause/resume capabilities
+- Right-sizing recommendations
 
-### ETL Pipeline
-```python
-# Step Functions workflow for ETL
-{
-  "StartAt": "DataValidation",
-  "States": {
-    "DataValidation": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:region:account:function:validate-data",
-      "Next": "DataTransformation"
-    },
-    "DataTransformation": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:region:account:function:transform-data",
-      "Next": "DataQuality"
-    },
-    "DataQuality": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:region:account:function:quality-check",
-      "Next": "DataLoad"
-    },
-    "DataLoad": {
-      "Type": "Task",
-      "Resource": "arn:aws:lambda:region:account:function:load-data",
-      "End": true
-    }
-  }
-}
-```
+### Kinesis Optimization
 
-## 📞 Support and Resources
+- Configurable shard count
+- Data retention policies
+- Compression for Firehose
 
-### Documentation
-- [AWS Data Analytics Documentation](https://docs.aws.amazon.com/analytics/)
-- [AWS Glue Documentation](https://docs.aws.amazon.com/glue/)
-- [AWS Redshift Documentation](https://docs.aws.amazon.com/redshift/)
-- [AWS Kinesis Documentation](https://docs.aws.amazon.com/kinesis/)
+## Troubleshooting
 
-### Community Resources
-- [AWS Data Blog](https://aws.amazon.com/blogs/big-data/)
-- [AWS Analytics Blog](https://aws.amazon.com/blogs/analytics/)
-- [AWS ML Blog](https://aws.amazon.com/blogs/machine-learning/)
+### Common Issues
 
-### Professional Services
-- AWS Professional Services
-- AWS Data Competency Partners
-- AWS Managed Analytics Services
+1. **S3 Bucket Name Conflicts**
+   - Ensure bucket name is globally unique
+   - Check for existing buckets in the region
 
-## 📄 License
+2. **VPC Configuration**
+   - Verify VPC ID exists
+   - Check subnet IDs are valid
+   - Ensure security groups allow required traffic
 
-This project is provided as-is for educational and demonstration purposes. Please review and modify according to your specific data requirements and security policies.
+3. **Redshift Connection Issues**
+   - Verify security group rules
+   - Check subnet group configuration
+   - Validate password requirements
 
-## 🤝 Contributing
+4. **Permission Errors**
+   - Ensure IAM roles have required permissions
+   - Check service-linked roles are created
+   - Verify cross-service access policies
+
+### Logs and Debugging
+
+- CloudWatch Logs: `/aws/data-analytics/{project-name}`
+- Glue Job Logs: `/aws-glue/jobs/logs-v2`
+- SageMaker Logs: `/aws/sagemaker/NotebookInstances`
+
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch
@@ -503,16 +365,24 @@ This project is provided as-is for educational and demonstration purposes. Pleas
 4. Add tests if applicable
 5. Submit a pull request
 
-## 📝 Changelog
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Support
+
+For issues and questions:
+
+1. Check the troubleshooting section
+2. Review AWS documentation
+3. Create an issue in the repository
+4. Contact the development team
+
+## Changelog
 
 ### Version 1.0.0
-- Initial release with comprehensive data analytics platform
-- Data lake architecture with S3 and Glue
-- ETL pipelines with Step Functions
-- Real-time streaming with Kinesis
-- Data warehouse with Redshift
-- Business intelligence with QuickSight
-- Machine learning with SageMaker
-- Data governance and compliance
-- Terraform and CloudFormation implementations
-- Python automation scripts and data processing
+- Initial release
+- Complete data analytics platform
+- Terraform and CloudFormation support
+- Python automation scripts
+- Comprehensive documentation

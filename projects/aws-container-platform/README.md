@@ -8,11 +8,11 @@ This project provides a complete container and Kubernetes solution including:
 
 - **EKS Cluster Management** - Production-ready Kubernetes clusters with auto-scaling
 - **Container Orchestration** - Advanced container deployment and management
-- **Service Mesh** - Istio-based service mesh for microservices
-- **CI/CD Integration** - Automated container build and deployment pipelines
-- **Monitoring & Observability** - Comprehensive container monitoring and logging
-- **Security & Compliance** - Container security scanning and compliance
-- **Multi-Environment Support** - Dev, staging, and production environments
+- **Container Registry** - ECR repository management and image operations
+- **Monitoring & Observability** - Prometheus, Grafana, and comprehensive logging
+- **Helm Chart Management** - Application and infrastructure chart management
+- **Infrastructure as Code** - Terraform and CloudFormation implementations
+- **Python Automation** - Comprehensive automation scripts for all operations
 
 ## 🏗️ Architecture
 
@@ -55,96 +55,57 @@ AWS Container & Kubernetes Platform
 ```
 aws-container-platform/
 ├── README.md                           # This documentation
-├── python/                             # Python automation scripts
-│   ├── eks_management/                 # EKS cluster management
-│   │   ├── cluster_manager.py         # EKS cluster automation
-│   │   ├── node_group_manager.py      # Node group management
-│   │   └── addon_manager.py           # EKS addon management
-│   ├── container_orchestration/        # Container orchestration
-│   │   ├── kubernetes_manager.py      # Kubernetes resource management
-│   │   ├── helm_manager.py            # Helm chart management
-│   │   └── operator_manager.py        # Kubernetes operator management
-│   ├── service_mesh/                   # Service mesh management
-│   │   ├── istio_manager.py           # Istio service mesh
-│   │   ├── traffic_manager.py         # Traffic management
-│   │   └── security_policies.py       # Security policies
-│   ├── cicd/                          # CI/CD automation
-│   │   ├── pipeline_manager.py        # CI/CD pipeline management
-│   │   ├── build_automation.py        # Build automation
-│   │   └── deployment_manager.py      # Deployment automation
-│   ├── monitoring/                     # Monitoring and observability
-│   │   ├── prometheus_manager.py      # Prometheus monitoring
-│   │   ├── grafana_manager.py         # Grafana dashboards
-│   │   └── alerting_manager.py        # Alerting automation
-│   ├── security/                       # Security and compliance
-│   │   ├── container_scanner.py       # Container security scanning
-│   │   ├── image_signing.py           # Image signing automation
-│   │   └── compliance_checker.py      # Compliance validation
-│   └── utils/                         # Utility functions
-│       ├── kubectl_wrapper.py         # Kubectl wrapper
-│       ├── docker_wrapper.py          # Docker wrapper
-│       └── helm_wrapper.py            # Helm wrapper
+├── requirements.txt                    # Python dependencies
+├── cloudformation/                     # CloudFormation templates
+│   └── container-platform.json        # Complete platform template
 ├── terraform/                          # Terraform infrastructure
 │   ├── main.tf                        # Main Terraform configuration
 │   ├── variables.tf                   # Terraform variables
 │   ├── outputs.tf                     # Terraform outputs
-│   ├── modules/                       # Terraform modules
-│   │   ├── eks_cluster/               # EKS cluster module
-│   │   ├── node_groups/               # Node groups module
-│   │   ├── addons/                    # EKS addons module
-│   │   ├── service_mesh/              # Service mesh module
-│   │   ├── monitoring/                # Monitoring module
-│   │   └── security/                  # Security module
-│   └── examples/                      # Example configurations
+│   └── templates/                     # Terraform templates
+│       └── user_data.sh               # EKS node user data script
+├── python/                             # Python automation scripts
+│   ├── eks_management/                 # EKS cluster management
+│   │   └── cluster_manager.py         # EKS cluster automation
+│   ├── container_orchestration/        # Container orchestration
+│   │   └── kubernetes_manager.py      # Kubernetes resource management
+│   ├── container_registry/             # Container registry management
+│   │   └── ecr_manager.py             # ECR operations
+│   └── monitoring/                     # Monitoring and observability
+│       └── prometheus_manager.py      # Prometheus monitoring
 ├── kubernetes/                         # Kubernetes manifests
 │   ├── namespaces/                    # Namespace definitions
+│   │   └── monitoring.yaml            # Monitoring namespace
 │   ├── deployments/                   # Deployment manifests
+│   │   ├── nginx-deployment.yaml      # Nginx deployment
+│   │   └── sample-app.yaml            # Sample application
 │   ├── services/                      # Service manifests
-│   ├── ingress/                       # Ingress configurations
-│   ├── configmaps/                    # ConfigMap definitions
-│   ├── secrets/                       # Secret definitions
-│   ├── storage/                       # Storage configurations
-│   └── rbac/                          # RBAC configurations
+│   │   └── nginx-service.yaml         # Nginx service
+│   └── ingress/                       # Ingress configurations
+│       └── nginx-ingress.yaml         # Nginx ingress
 ├── helm/                              # Helm charts
 │   ├── applications/                  # Application charts
-│   ├── infrastructure/                # Infrastructure charts
+│   │   ├── nginx/                     # Nginx application chart
+│   │   │   ├── Chart.yaml
+│   │   │   ├── values.yaml
+│   │   │   └── templates/
+│   │   │       └── deployment.yaml
+│   │   └── sample-app/                # Sample application chart
+│   │       ├── Chart.yaml
+│   │       ├── values.yaml
+│   │       └── templates/
+│   │           └── deployment.yaml
 │   ├── monitoring/                    # Monitoring charts
-│   └── security/                      # Security charts
-├── docker/                            # Docker configurations
-│   ├── Dockerfiles/                   # Dockerfile templates
-│   ├── docker-compose/                # Docker Compose files
-│   └── build-scripts/                 # Build scripts
-├── cicd/                              # CI/CD configurations
-│   ├── github-actions/                # GitHub Actions workflows
-│   ├── jenkins/                       # Jenkins pipelines
-│   ├── gitlab-ci/                     # GitLab CI/CD
-│   └── argocd/                        # ArgoCD configurations
-├── monitoring/                        # Monitoring configurations
-│   ├── prometheus/                    # Prometheus configurations
-│   ├── grafana/                       # Grafana dashboards
-│   ├── alertmanager/                  # AlertManager configurations
-│   └── jaeger/                        # Distributed tracing
-├── security/                          # Security configurations
-│   ├── policies/                      # Security policies
-│   ├── scanning/                      # Security scanning
-│   ├── compliance/                    # Compliance configurations
-│   └── certificates/                  # SSL/TLS certificates
-├── config/                            # Configuration files
-│   ├── platform_config.yaml           # Platform configuration
-│   ├── cluster_config.yaml            # Cluster configuration
-│   ├── monitoring_config.yaml         # Monitoring configuration
-│   └── security_config.yaml           # Security configuration
-├── scripts/                           # Deployment and utility scripts
-│   ├── deploy_platform.sh             # Deploy container platform
-│   ├── setup_cluster.sh               # Setup EKS cluster
-│   ├── deploy_applications.sh         # Deploy applications
-│   └── monitoring_setup.sh            # Setup monitoring
-├── dashboards/                        # Grafana dashboards
-│   ├── kubernetes_dashboard.json      # Kubernetes dashboard
-│   ├── application_dashboard.json     # Application dashboard
-│   ├── infrastructure_dashboard.json  # Infrastructure dashboard
-│   └── security_dashboard.json        # Security dashboard
-└── requirements.txt                   # Python dependencies
+│   │   └── prometheus/                # Prometheus monitoring stack
+│   │       ├── Chart.yaml
+│   │       └── values.yaml
+│   └── logging/                       # Logging charts
+│       └── elasticsearch/             # Elasticsearch logging stack
+│           ├── Chart.yaml
+│           └── values.yaml
+└── scripts/                           # Deployment and utility scripts
+    ├── deploy_platform.sh             # Deploy container platform
+    └── setup_monitoring.sh            # Setup monitoring stack
 ```
 
 ## 🚀 Quick Start

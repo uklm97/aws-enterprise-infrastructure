@@ -1,0 +1,40 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Installing performance testing tools...
+      - pip install locust pytest-benchmark memory-profiler
+      - echo Performance testing tools installed
+
+  build:
+    commands:
+      - echo Performance testing started on `date`
+      - echo Running load tests with Locust...
+      - locust --host=$TARGET_URL --headless --users=100 --spawn-rate=10 --run-time=300s --html=load-test-report.html || true
+      - echo Running benchmark tests...
+      - python -m pytest tests/performance/ --benchmark-json=benchmark-report.json || true
+      - echo Running memory profiling...
+      - python -m memory_profiler tests/performance/memory_test.py || true
+      - echo Performance testing completed on `date`
+
+  post_build:
+    commands:
+      - echo Build phase completed on `date`
+      - echo Uploading performance reports to S3...
+      - aws s3 cp load-test-report.html s3://$ARTIFACTS_BUCKET/performance-reports/load-test-report-$CODEBUILD_BUILD_ID.html
+      - aws s3 cp benchmark-report.json s3://$ARTIFACTS_BUCKET/performance-reports/benchmark-report-$CODEBUILD_BUILD_ID.json
+      - echo Performance reports uploaded successfully
+
+artifacts:
+  files:
+    - load-test-report.html
+    - benchmark-report.json
+  name: performance-reports-$CODEBUILD_BUILD_ID
+
+reports:
+  performance-report:
+    files:
+      - 'benchmark-report.json'
+    base-directory: .
+    file-format: JSON

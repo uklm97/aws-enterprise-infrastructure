@@ -1,0 +1,51 @@
+version: 0.2
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - echo Installing security scanning tools...
+      - pip install bandit safety semgrep pip-audit
+      - echo Security scanning tools installed
+
+  build:
+    commands:
+      - echo Security scanning started on `date`
+      - echo Running Bandit security linter...
+      - bandit -r . -f json -o bandit-report.json || true
+      - echo Running Safety dependency check...
+      - safety check --json --output safety-report.json || true
+      - echo Running Semgrep static analysis...
+      - semgrep --config=auto --json --output semgrep-report.json . || true
+      - echo Running pip-audit...
+      - pip-audit --format=json --output pip-audit-report.json || true
+      - echo Security scanning completed on `date`
+
+  post_build:
+    commands:
+      - echo Build phase completed on `date`
+      - echo Uploading security reports to S3...
+      - aws s3 cp bandit-report.json s3://$ARTIFACTS_BUCKET/security-reports/bandit-report-$CODEBUILD_BUILD_ID.json
+      - aws s3 cp safety-report.json s3://$ARTIFACTS_BUCKET/security-reports/safety-report-$CODEBUILD_BUILD_ID.json
+      - aws s3 cp semgrep-report.json s3://$ARTIFACTS_BUCKET/security-reports/semgrep-report-$CODEBUILD_BUILD_ID.json
+      - aws s3 cp pip-audit-report.json s3://$ARTIFACTS_BUCKET/security-reports/pip-audit-report-$CODEBUILD_BUILD_ID.json
+      - echo Security reports uploaded successfully
+
+artifacts:
+  files:
+    - bandit-report.json
+    - safety-report.json
+    - semgrep-report.json
+    - pip-audit-report.json
+  name: security-reports-$CODEBUILD_BUILD_ID
+
+reports:
+  security-report:
+    files:
+      - 'bandit-report.json'
+      - 'safety-report.json'
+      - 'semgrep-report.json'
+      - 'pip-audit-report.json'
+    base-directory: .
+    file-format: JSON

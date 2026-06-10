@@ -1,0 +1,1314 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS Serverless Platform - Complete serverless infrastructure with Lambda, DynamoDB, SQS, SNS, Step Functions, and API Gateway",
+  
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "aws-serverless-platform",
+      "Description": "Project name for resource naming"
+    },
+    "Environment": {
+      "Type": "String",
+      "Default": "dev",
+      "AllowedValues": ["dev", "staging", "prod"],
+      "Description": "Environment name"
+    },
+    "AWSRegion": {
+      "Type": "String",
+      "Default": "us-east-1",
+      "Description": "AWS region for resources"
+    },
+    "VPCId": {
+      "Type": "String",
+      "Default": "",
+      "Description": "VPC ID for Lambda functions (optional)"
+    },
+    "SubnetIds": {
+      "Type": "CommaDelimitedList",
+      "Default": "",
+      "Description": "Subnet IDs for Lambda functions (optional)"
+    },
+    "NotificationEmail": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Email address for notifications"
+    },
+    "AlertEmail": {
+      "Type": "String",
+      "Default": "",
+      "Description": "Email address for system alerts"
+    },
+    "LogRetentionDays": {
+      "Type": "Number",
+      "Default": 14,
+      "MinValue": 1,
+      "MaxValue": 3653,
+      "Description": "CloudWatch log retention in days"
+    },
+    "EnableXRayTracing": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable X-Ray tracing"
+    },
+    "EnableEncryption": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Enable encryption for all resources"
+    },
+    "CreateDynamoDBTables": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Create DynamoDB tables"
+    },
+    "CreateSQSQueues": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Create SQS queues"
+    },
+    "CreateSNSTopics": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Create SNS topics"
+    },
+    "CreateLambdaFunctions": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Create Lambda functions"
+    },
+    "CreateStepFunctions": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Create Step Functions state machines"
+    },
+    "CreateAPIGateway": {
+      "Type": "String",
+      "Default": "true",
+      "AllowedValues": ["true", "false"],
+      "Description": "Create API Gateway"
+    },
+    "LambdaRuntime": {
+      "Type": "String",
+      "Default": "python3.9",
+      "AllowedValues": ["python3.8", "python3.9", "python3.10", "python3.11"],
+      "Description": "Lambda runtime"
+    },
+    "LambdaTimeout": {
+      "Type": "Number",
+      "Default": 300,
+      "MinValue": 1,
+      "MaxValue": 900,
+      "Description": "Lambda timeout in seconds"
+    },
+    "LambdaMemorySize": {
+      "Type": "Number",
+      "Default": 256,
+      "MinValue": 128,
+      "MaxValue": 10240,
+      "Description": "Lambda memory size in MB"
+    }
+  },
+  
+  "Conditions": {
+    "CreateDynamoDB": {
+      "Fn::Equals": [{"Ref": "CreateDynamoDBTables"}, "true"]
+    },
+    "CreateSQS": {
+      "Fn::Equals": [{"Ref": "CreateSQSQueues"}, "true"]
+    },
+    "CreateSNS": {
+      "Fn::Equals": [{"Ref": "CreateSNSTopics"}, "true"]
+    },
+    "CreateLambda": {
+      "Fn::Equals": [{"Ref": "CreateLambdaFunctions"}, "true"]
+    },
+    "CreateStepFunctions": {
+      "Fn::Equals": [{"Ref": "CreateStepFunctions"}, "true"]
+    },
+    "CreateAPIGateway": {
+      "Fn::Equals": [{"Ref": "CreateAPIGateway"}, "true"]
+    },
+    "EnableEncryption": {
+      "Fn::Equals": [{"Ref": "EnableEncryption"}, "true"]
+    },
+    "EnableXRay": {
+      "Fn::Equals": [{"Ref": "EnableXRayTracing"}, "true"]
+    },
+    "HasVPC": {
+      "Fn::Not": [{"Fn::Equals": [{"Ref": "VPCId"}, ""]}]
+    },
+    "HasNotificationEmail": {
+      "Fn::Not": [{"Fn::Equals": [{"Ref": "NotificationEmail"}, ""]}]
+    },
+    "HasAlertEmail": {
+      "Fn::Not": [{"Fn::Equals": [{"Ref": "AlertEmail"}, ""]}]
+    }
+  },
+  
+  "Resources": {
+    "KMSKey": {
+      "Type": "AWS::KMS::Key",
+      "Condition": "EnableEncryption",
+      "Properties": {
+        "Description": {
+          "Fn::Sub": "KMS key for ${ProjectName} serverless platform encryption"
+        },
+        "KeyPolicy": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "Enable IAM User Permissions",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": {
+                  "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:root"
+                }
+              },
+              "Action": "kms:*",
+              "Resource": "*"
+            }
+          ]
+        },
+        "EnableKeyRotation": true,
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-serverless-encryption"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "KMSKeyAlias": {
+      "Type": "AWS::KMS::Alias",
+      "Condition": "EnableEncryption",
+      "Properties": {
+        "AliasName": {
+          "Fn::Sub": "alias/${ProjectName}-serverless-encryption"
+        },
+        "TargetKeyId": {"Ref": "KMSKey"}
+      }
+    },
+    
+    "LambdaExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "${ProjectName}-lambda-execution-role"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "lambda.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole",
+          "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
+        ],
+        "Policies": [
+          {
+            "PolicyName": "ServerlessPlatformPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:*",
+                    "s3:*",
+                    "sqs:*",
+                    "sns:*",
+                    "stepfunctions:*",
+                    "apigateway:*",
+                    "logs:*",
+                    "cloudwatch:*",
+                    "xray:*"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-lambda-execution-role"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "StepFunctionsExecutionRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "RoleName": {
+          "Fn::Sub": "${ProjectName}-stepfunctions-execution-role"
+        },
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "states.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "StepFunctionsExecutionPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:InvokeFunction",
+                    "lambda:InvokeAsync",
+                    "sqs:SendMessage",
+                    "sqs:ReceiveMessage",
+                    "sqs:DeleteMessage",
+                    "sns:Publish",
+                    "dynamodb:PutItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:UpdateItem",
+                    "dynamodb:DeleteItem",
+                    "dynamodb:Query",
+                    "dynamodb:Scan",
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-stepfunctions-execution-role"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "UsersTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Condition": "CreateDynamoDB",
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "${ProjectName}-users"
+        },
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "user_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "email",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "created_at",
+            "AttributeType": "N"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "user_id",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "email",
+            "KeyType": "RANGE"
+          }
+        ],
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "email-index",
+            "KeySchema": [
+              {
+                "AttributeName": "email",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+          {
+            "IndexName": "created-at-index",
+            "KeySchema": [
+              {
+                "AttributeName": "created_at",
+                "KeyType": "HASH"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ],
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "Fn::If": [
+            "EnableEncryption",
+            {
+              "SSEEnabled": true,
+              "KMSMasterKeyId": {"Ref": "KMSKey"}
+            },
+            {
+              "SSEEnabled": false
+            }
+          ]
+        },
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-users"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "OrdersTable": {
+      "Type": "AWS::DynamoDB::Table",
+      "Condition": "CreateDynamoDB",
+      "Properties": {
+        "TableName": {
+          "Fn::Sub": "${ProjectName}-orders"
+        },
+        "BillingMode": "PAY_PER_REQUEST",
+        "AttributeDefinitions": [
+          {
+            "AttributeName": "order_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "user_id",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "status",
+            "AttributeType": "S"
+          },
+          {
+            "AttributeName": "created_at",
+            "AttributeType": "N"
+          }
+        ],
+        "KeySchema": [
+          {
+            "AttributeName": "order_id",
+            "KeyType": "HASH"
+          },
+          {
+            "AttributeName": "user_id",
+            "KeyType": "RANGE"
+          }
+        ],
+        "GlobalSecondaryIndexes": [
+          {
+            "IndexName": "user-orders-index",
+            "KeySchema": [
+              {
+                "AttributeName": "user_id",
+                "KeyType": "HASH"
+              },
+              {
+                "AttributeName": "created_at",
+                "KeyType": "RANGE"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          },
+          {
+            "IndexName": "status-index",
+            "KeySchema": [
+              {
+                "AttributeName": "status",
+                "KeyType": "HASH"
+              },
+              {
+                "AttributeName": "created_at",
+                "KeyType": "RANGE"
+              }
+            ],
+            "Projection": {
+              "ProjectionType": "ALL"
+            }
+          }
+        ],
+        "PointInTimeRecoverySpecification": {
+          "PointInTimeRecoveryEnabled": true
+        },
+        "SSESpecification": {
+          "Fn::If": [
+            "EnableEncryption",
+            {
+              "SSEEnabled": true,
+              "KMSMasterKeyId": {"Ref": "KMSKey"}
+            },
+            {
+              "SSEEnabled": false
+            }
+          ]
+        },
+        "StreamSpecification": {
+          "StreamViewType": "NEW_AND_OLD_IMAGES"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-orders"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "OrderProcessingQueue": {
+      "Type": "AWS::SQS::Queue",
+      "Condition": "CreateSQS",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${ProjectName}-order-processing"
+        },
+        "VisibilityTimeoutSeconds": 300,
+        "MessageRetentionPeriod": 1209600,
+        "MaxMessageSize": 262144,
+        "DelaySeconds": 0,
+        "ReceiveMessageWaitTimeSeconds": 20,
+        "KmsMasterKeyId": {
+          "Fn::If": [
+            "EnableEncryption",
+            {"Ref": "KMSKey"},
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-order-processing"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "OrderProcessingDLQ": {
+      "Type": "AWS::SQS::Queue",
+      "Condition": "CreateSQS",
+      "Properties": {
+        "QueueName": {
+          "Fn::Sub": "${ProjectName}-order-processing-dlq"
+        },
+        "MessageRetentionPeriod": 1209600,
+        "MaxMessageSize": 262144,
+        "KmsMasterKeyId": {
+          "Fn::If": [
+            "EnableEncryption",
+            {"Ref": "KMSKey"},
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-order-processing-dlq"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "OrderProcessingQueueRedrivePolicy": {
+      "Type": "AWS::SQS::QueuePolicy",
+      "Condition": "CreateSQS",
+      "Properties": {
+        "Queues": [{"Ref": "OrderProcessingQueue"}],
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": "sqs:SendMessage",
+              "Resource": {"Ref": "OrderProcessingQueue"},
+              "Condition": {
+                "ArnEquals": {
+                  "aws:SourceArn": {"Ref": "OrderProcessingDLQ"}
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    
+    "OrderNotificationsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Condition": "CreateSNS",
+      "Properties": {
+        "TopicName": {
+          "Fn::Sub": "${ProjectName}-order-notifications"
+        },
+        "KmsMasterKeyId": {
+          "Fn::If": [
+            "EnableEncryption",
+            {"Ref": "KMSKey"},
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-order-notifications"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "SystemAlertsTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Condition": "CreateSNS",
+      "Properties": {
+        "TopicName": {
+          "Fn::Sub": "${ProjectName}-system-alerts"
+        },
+        "KmsMasterKeyId": {
+          "Fn::If": [
+            "EnableEncryption",
+            {"Ref": "KMSKey"},
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-system-alerts"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "OrderProcessorFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Condition": "CreateLambda",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${ProjectName}-order-processor"
+        },
+        "Runtime": {"Ref": "LambdaRuntime"},
+        "Handler": "index.handler",
+        "Role": {"Ref": "LambdaExecutionRole"},
+        "Timeout": {"Ref": "LambdaTimeout"},
+        "MemorySize": {"Ref": "LambdaMemorySize"},
+        "Environment": {
+          "Variables": {
+            "DYNAMODB_TABLE": {
+              "Fn::If": [
+                "CreateDynamoDB",
+                {"Ref": "UsersTable"},
+                ""
+              ]
+            },
+            "SNS_TOPIC_ARN": {
+              "Fn::If": [
+                "CreateSNS",
+                {"Ref": "OrderNotificationsTopic"},
+                ""
+              ]
+            }
+          }
+        },
+        "VpcConfig": {
+          "Fn::If": [
+            "HasVPC",
+            {
+              "SecurityGroupIds": [{"Ref": "LambdaSecurityGroup"}],
+              "SubnetIds": {"Ref": "SubnetIds"}
+            },
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "DeadLetterConfig": {
+          "Fn::If": [
+            "CreateSQS",
+            {
+              "TargetArn": {"Ref": "OrderProcessingDLQ"}
+            },
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "TracingConfig": {
+          "Fn::If": [
+            "EnableXRay",
+            {
+              "Mode": "Active"
+            },
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "Code": {
+          "ZipFile": "def handler(event, context):\n    return {'statusCode': 200, 'body': 'Order processed successfully'}"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-order-processor"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "NotificationSenderFunction": {
+      "Type": "AWS::Lambda::Function",
+      "Condition": "CreateLambda",
+      "Properties": {
+        "FunctionName": {
+          "Fn::Sub": "${ProjectName}-notification-sender"
+        },
+        "Runtime": {"Ref": "LambdaRuntime"},
+        "Handler": "index.handler",
+        "Role": {"Ref": "LambdaExecutionRole"},
+        "Timeout": 60,
+        "MemorySize": 128,
+        "Environment": {
+          "Variables": {
+            "SNS_TOPIC_ARN": {
+              "Fn::If": [
+                "CreateSNS",
+                {"Ref": "OrderNotificationsTopic"},
+                ""
+              ]
+            }
+          }
+        },
+        "TracingConfig": {
+          "Fn::If": [
+            "EnableXRay",
+            {
+              "Mode": "Active"
+            },
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "Code": {
+          "ZipFile": "def handler(event, context):\n    return {'statusCode': 200, 'body': 'Notification sent successfully'}"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-notification-sender"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "OrderWorkflowStateMachine": {
+      "Type": "AWS::StepFunctions::StateMachine",
+      "Condition": "CreateStepFunctions",
+      "Properties": {
+        "StateMachineName": {
+          "Fn::Sub": "${ProjectName}-order-workflow"
+        },
+        "RoleArn": {"Ref": "StepFunctionsExecutionRole"},
+        "DefinitionString": {
+          "Fn::Sub": [
+            "{\n  \"Comment\": \"Order processing workflow\",\n  \"StartAt\": \"ProcessOrder\",\n  \"States\": {\n    \"ProcessOrder\": {\n      \"Type\": \"Task\",\n      \"Resource\": \"${OrderProcessorArn}\",\n      \"Next\": \"SendNotification\",\n      \"Retry\": [\n        {\n          \"ErrorEquals\": [\"Lambda.ServiceException\", \"Lambda.AWSLambdaException\", \"Lambda.SdkClientException\"],\n          \"IntervalSeconds\": 2,\n          \"MaxAttempts\": 6,\n          \"BackoffRate\": 2\n        }\n      ],\n      \"Catch\": [\n        {\n          \"ErrorEquals\": [\"States.ALL\"],\n          \"Next\": \"HandleError\"\n        }\n      ]\n    },\n    \"SendNotification\": {\n      \"Type\": \"Task\",\n      \"Resource\": \"${NotificationSenderArn}\",\n      \"End\": true,\n      \"Retry\": [\n        {\n          \"ErrorEquals\": [\"Lambda.ServiceException\", \"Lambda.AWSLambdaException\", \"Lambda.SdkClientException\"],\n          \"IntervalSeconds\": 2,\n          \"MaxAttempts\": 6,\n          \"BackoffRate\": 2\n        }\n      ],\n      \"Catch\": [\n        {\n          \"ErrorEquals\": [\"States.ALL\"],\n          \"Next\": \"HandleError\"\n        }\n      ]\n    },\n    \"HandleError\": {\n      \"Type\": \"Fail\",\n      \"Cause\": \"Order processing failed\"\n    }\n  }\n}",
+            {
+              "OrderProcessorArn": {
+                "Fn::If": [
+                  "CreateLambda",
+                  {"Ref": "OrderProcessorFunction"},
+                  ""
+                ]
+              },
+              "NotificationSenderArn": {
+                "Fn::If": [
+                  "CreateLambda",
+                  {"Ref": "NotificationSenderFunction"},
+                  ""
+                ]
+              }
+            }
+          ]
+        },
+        "LoggingConfiguration": {
+          "Fn::If": [
+            "CreateStepFunctions",
+            {
+              "LogDestination": {
+                "Fn::GetAtt": ["StepFunctionsLogGroup", "Arn"]
+              },
+              "IncludeExecutionData": true,
+              "Level": "ERROR"
+            },
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "TracingConfiguration": {
+          "Fn::If": [
+            "EnableXRay",
+            {
+              "Enabled": true
+            },
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-order-workflow"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "ServerlessAPI": {
+      "Type": "AWS::ApiGateway::RestApi",
+      "Condition": "CreateAPIGateway",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-api"
+        },
+        "Description": "Serverless platform API",
+        "EndpointConfiguration": {
+          "Types": ["REGIONAL"]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-api"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "OrdersResource": {
+      "Type": "AWS::ApiGateway::Resource",
+      "Condition": "CreateAPIGateway",
+      "Properties": {
+        "RestApiId": {"Ref": "ServerlessAPI"},
+        "ParentId": {"Fn::GetAtt": ["ServerlessAPI", "RootResourceId"]},
+        "PathPart": "orders"
+      }
+    },
+    
+    "OrdersPostMethod": {
+      "Type": "AWS::ApiGateway::Method",
+      "Condition": "CreateAPIGateway",
+      "Properties": {
+        "RestApiId": {"Ref": "ServerlessAPI"},
+        "ResourceId": {"Ref": "OrdersResource"},
+        "HttpMethod": "POST",
+        "AuthorizationType": "NONE"
+      }
+    },
+    
+    "OrdersPostIntegration": {
+      "Type": "AWS::ApiGateway::Integration",
+      "Condition": "CreateAPIGateway",
+      "Properties": {
+        "RestApiId": {"Ref": "ServerlessAPI"},
+        "ResourceId": {"Ref": "OrdersResource"},
+        "HttpMethod": {"Ref": "OrdersPostMethod"},
+        "IntegrationHttpMethod": "POST",
+        "Type": "AWS_PROXY",
+        "Uri": {
+          "Fn::If": [
+            "CreateLambda",
+            {
+              "Fn::Sub": "arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OrderProcessorFunction}/invocations"
+            },
+            {"Ref": "AWS::NoValue"}
+          ]
+        }
+      }
+    },
+    
+    "APIGatewayLambdaPermission": {
+      "Type": "AWS::Lambda::Permission",
+      "Condition": "CreateAPIGateway",
+      "Properties": {
+        "FunctionName": {
+          "Fn::If": [
+            "CreateLambda",
+            {"Ref": "OrderProcessorFunction"},
+            {"Ref": "AWS::NoValue"}
+          ]
+        },
+        "Action": "lambda:InvokeFunction",
+        "Principal": "apigateway.amazonaws.com",
+        "SourceArn": {
+          "Fn::Sub": "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ServerlessAPI}/*/*"
+        }
+      }
+    },
+    
+    "APIDeployment": {
+      "Type": "AWS::ApiGateway::Deployment",
+      "Condition": "CreateAPIGateway",
+      "DependsOn": ["OrdersPostIntegration"],
+      "Properties": {
+        "RestApiId": {"Ref": "ServerlessAPI"},
+        "StageName": "prod"
+      }
+    },
+    
+    "LambdaLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Condition": "CreateLambda",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/lambda/${ProjectName}"
+        },
+        "RetentionInDays": {"Ref": "LogRetentionDays"},
+        "KmsKeyId": {
+          "Fn::If": [
+            "EnableEncryption",
+            {"Ref": "KMSKey"},
+            {"Ref": "AWS::NoValue"}
+          ]
+        }
+      }
+    },
+    
+    "StepFunctionsLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Condition": "CreateStepFunctions",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/stepfunctions/${ProjectName}"
+        },
+        "RetentionInDays": {"Ref": "LogRetentionDays"},
+        "KmsKeyId": {
+          "Fn::If": [
+            "EnableEncryption",
+            {"Ref": "KMSKey"},
+            {"Ref": "AWS::NoValue"}
+          ]
+        }
+      }
+    },
+    
+    "LambdaSecurityGroup": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Condition": "HasVPC",
+      "Properties": {
+        "GroupName": {
+          "Fn::Sub": "${ProjectName}-lambda-sg"
+        },
+        "GroupDescription": "Security group for Lambda functions",
+        "VpcId": {"Ref": "VPCId"},
+        "SecurityGroupEgress": [
+          {
+            "IpProtocol": "-1",
+            "CidrIp": "0.0.0.0/0"
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-lambda-sg"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "LambdaErrorsAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Condition": "CreateLambda",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${ProjectName}-lambda-errors"
+        },
+        "AlarmDescription": "Lambda function errors",
+        "MetricName": "Errors",
+        "Namespace": "AWS/Lambda",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 2,
+        "Threshold": 5,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "Dimensions": [
+          {
+            "Name": "FunctionName",
+            "Value": {"Ref": "OrderProcessorFunction"}
+          }
+        ],
+        "AlarmActions": {
+          "Fn::If": [
+            "CreateSNS",
+            [{"Ref": "SystemAlertsTopic"}],
+            []
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-lambda-errors"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "DynamoDBThrottlesAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Condition": "CreateDynamoDB",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${ProjectName}-dynamodb-throttles"
+        },
+        "AlarmDescription": "DynamoDB throttled requests",
+        "MetricName": "ThrottledRequests",
+        "Namespace": "AWS/DynamoDB",
+        "Statistic": "Sum",
+        "Period": 300,
+        "EvaluationPeriods": 2,
+        "Threshold": 10,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "Dimensions": [
+          {
+            "Name": "TableName",
+            "Value": {"Ref": "UsersTable"}
+          }
+        ],
+        "AlarmActions": {
+          "Fn::If": [
+            "CreateSNS",
+            [{"Ref": "SystemAlertsTopic"}],
+            []
+          ]
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-dynamodb-throttles"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "EmailNotificationSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Condition": "HasNotificationEmail",
+      "Properties": {
+        "Protocol": "email",
+        "TopicArn": {"Ref": "OrderNotificationsTopic"},
+        "Endpoint": {"Ref": "NotificationEmail"}
+      }
+    },
+    
+    "SystemAlertsEmailSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Condition": "HasAlertEmail",
+      "Properties": {
+        "Protocol": "email",
+        "TopicArn": {"Ref": "SystemAlertsTopic"},
+        "Endpoint": {"Ref": "AlertEmail"}
+      }
+    },
+    
+    "OrderProcessingSchedule": {
+      "Type": "AWS::Events::Rule",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-order-processing-schedule"
+        },
+        "Description": "Trigger order processing workflow",
+        "ScheduleExpression": "rate(5 minutes)",
+        "State": "ENABLED",
+        "Targets": [
+          {
+            "Arn": {
+              "Fn::If": [
+                "CreateStepFunctions",
+                {"Ref": "OrderWorkflowStateMachine"},
+                {"Ref": "AWS::NoValue"}
+              ]
+            },
+            "Id": "StepFunctionsTarget",
+            "RoleArn": {
+              "Fn::If": [
+                "CreateStepFunctions",
+                {"Ref": "StepFunctionsExecutionRole"},
+                {"Ref": "AWS::NoValue"}
+              ]
+            }
+          }
+        ],
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-order-processing-schedule"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    },
+    
+    "XRaySamplingRule": {
+      "Type": "AWS::XRay::SamplingRule",
+      "Condition": "EnableXRay",
+      "Properties": {
+        "RuleName": {
+          "Fn::Sub": "${ProjectName}-serverless-tracing"
+        },
+        "Priority": 10000,
+        "Version": 1,
+        "ReservoirSize": 1,
+        "FixedRate": 0.1,
+        "URLPath": "*",
+        "Host": "*",
+        "HTTPMethod": "*",
+        "ServiceType": "*",
+        "ServiceName": "*",
+        "ResourceARN": "*",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": {
+              "Fn::Sub": "${ProjectName}-serverless-tracing"
+            }
+          },
+          {
+            "Key": "Environment",
+            "Value": {"Ref": "Environment"}
+          }
+        ]
+      }
+    }
+  },
+  
+  "Outputs": {
+    "KMSKeyId": {
+      "Description": "KMS key ID for encryption",
+      "Value": {
+        "Fn::If": [
+          "EnableEncryption",
+          {"Ref": "KMSKey"},
+          "Not created"
+        ]
+      }
+    },
+    "KMSKeyArn": {
+      "Description": "KMS key ARN for encryption",
+      "Value": {
+        "Fn::If": [
+          "EnableEncryption",
+          {"Ref": "KMSKey"},
+          "Not created"
+        ]
+      }
+    },
+    "DynamoDBTables": {
+      "Description": "DynamoDB table information",
+      "Value": {
+        "Fn::If": [
+          "CreateDynamoDB",
+          {
+            "Fn::Sub": "Users: ${UsersTable}, Orders: ${OrdersTable}"
+          },
+          "Not created"
+        ]
+      }
+    },
+    "SQSQueues": {
+      "Description": "SQS queue information",
+      "Value": {
+        "Fn::If": [
+          "CreateSQS",
+          {
+            "Fn::Sub": "Order Processing: ${OrderProcessingQueue}, DLQ: ${OrderProcessingDLQ}"
+          },
+          "Not created"
+        ]
+      }
+    },
+    "SNSTopics": {
+      "Description": "SNS topic information",
+      "Value": {
+        "Fn::If": [
+          "CreateSNS",
+          {
+            "Fn::Sub": "Order Notifications: ${OrderNotificationsTopic}, System Alerts: ${SystemAlertsTopic}"
+          },
+          "Not created"
+        ]
+      }
+    },
+    "LambdaFunctions": {
+      "Description": "Lambda function information",
+      "Value": {
+        "Fn::If": [
+          "CreateLambda",
+          {
+            "Fn::Sub": "Order Processor: ${OrderProcessorFunction}, Notification Sender: ${NotificationSenderFunction}"
+          },
+          "Not created"
+        ]
+      }
+    },
+    "StepFunctionsStateMachine": {
+      "Description": "Step Functions state machine information",
+      "Value": {
+        "Fn::If": [
+          "CreateStepFunctions",
+          {"Ref": "OrderWorkflowStateMachine"},
+          "Not created"
+        ]
+      }
+    },
+    "APIGatewayURL": {
+      "Description": "API Gateway URL",
+      "Value": {
+        "Fn::If": [
+          "CreateAPIGateway",
+          {
+            "Fn::Sub": "https://${ServerlessAPI}.execute-api.${AWS::Region}.amazonaws.com/prod"
+          },
+          "Not created"
+        ]
+      }
+    },
+    "CloudWatchLogGroups": {
+      "Description": "CloudWatch log group information",
+      "Value": {
+        "Fn::Sub": "Lambda: /aws/lambda/${ProjectName}, Step Functions: /aws/stepfunctions/${ProjectName}"
+      }
+    },
+    "ConnectionInfo": {
+      "Description": "Connection information for the serverless platform",
+      "Value": {
+        "Fn::Sub": "Region: ${AWS::Region}, Account: ${AWS::AccountId}, Project: ${ProjectName}"
+      }
+    }
+  }
+}

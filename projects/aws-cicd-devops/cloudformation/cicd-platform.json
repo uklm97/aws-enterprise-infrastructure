@@ -1,0 +1,697 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "AWS CI/CD & DevOps Platform - Complete infrastructure for continuous integration and deployment",
+  "Parameters": {
+    "ProjectName": {
+      "Type": "String",
+      "Default": "aws-cicd-devops",
+      "Description": "Name of the project"
+    },
+    "Environment": {
+      "Type": "String",
+      "Default": "production",
+      "AllowedValues": ["dev", "staging", "production"],
+      "Description": "Environment name"
+    },
+    "ArtifactsBucketName": {
+      "Type": "String",
+      "Description": "Name of the S3 bucket for artifacts (must be globally unique)"
+    },
+    "SourceRepository": {
+      "Type": "String",
+      "Default": "https://github.com/example/repo.git",
+      "Description": "Source code repository URL"
+    },
+    "SourceBranch": {
+      "Type": "String",
+      "Default": "main",
+      "Description": "Source code branch"
+    },
+    "DockerImageName": {
+      "Type": "String",
+      "Default": "my-app",
+      "Description": "Docker image name"
+    },
+    "DockerImageTag": {
+      "Type": "String",
+      "Default": "latest",
+      "Description": "Docker image tag"
+    },
+    "NotificationEmail": {
+      "Type": "String",
+      "Description": "Email address for notifications"
+    }
+  },
+  "Conditions": {
+    "IsProduction": {
+      "Fn::Equals": [{"Ref": "Environment"}, "production"]
+    }
+  },
+  "Resources": {
+    "ArtifactsBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {"Ref": "ArtifactsBucketName"},
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        },
+        "LifecycleConfiguration": {
+          "Rules": [
+            {
+              "Id": "DeleteOldArtifacts",
+              "Status": "Enabled",
+              "ExpirationInDays": 30
+            }
+          ]
+        }
+      }
+    },
+    "CacheBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Fn::Sub": "${ArtifactsBucketName}-cache"
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "BucketEncryption": {
+          "ServerSideEncryptionConfiguration": [
+            {
+              "ServerSideEncryptionByDefault": {
+                "SSEAlgorithm": "AES256"
+              }
+            }
+          ]
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": true,
+          "BlockPublicPolicy": true,
+          "IgnorePublicAcls": true,
+          "RestrictPublicBuckets": true
+        }
+      }
+    },
+    "CodePipelineRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codepipeline.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "CodePipelinePolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                    "s3:PutObject",
+                    "s3:PutObjectAcl"
+                  ],
+                  "Resource": [
+                    {"Fn::Sub": "${ArtifactsBucket}/*"},
+                    {"Fn::Sub": "${CacheBucket}/*"}
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codebuild:BatchGetBuilds",
+                    "codebuild:StartBuild"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "codedeploy:CreateDeployment",
+                    "codedeploy:GetApplication",
+                    "codedeploy:GetApplicationRevision",
+                    "codedeploy:GetDeployment",
+                    "codedeploy:GetDeploymentConfig",
+                    "codedeploy:RegisterApplicationRevision"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CodeBuildRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codebuild.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "Policies": [
+          {
+            "PolicyName": "CodeBuildPolicy",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:GetObjectVersion",
+                    "s3:PutObject"
+                  ],
+                  "Resource": [
+                    {"Fn::Sub": "${ArtifactsBucket}/*"},
+                    {"Fn::Sub": "${CacheBucket}/*"}
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "logs:CreateLogGroup",
+                    "logs:CreateLogStream",
+                    "logs:PutLogEvents"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:GetAuthorizationToken",
+                    "ecr:BatchCheckLayerAvailability",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:BatchGetImage"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "ecr:InitiateLayerUpload",
+                    "ecr:UploadLayerPart",
+                    "ecr:CompleteLayerUpload",
+                    "ecr:PutImage"
+                  ],
+                  "Resource": "*"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "CodeDeployRole": {
+      "Type": "AWS::IAM::Role",
+      "Properties": {
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": {
+                "Service": "codedeploy.amazonaws.com"
+              },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
+        ]
+      }
+    },
+    "BuildLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/codebuild/${ProjectName}-build"
+        },
+        "RetentionInDays": 30
+      }
+    },
+    "TestLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/codebuild/${ProjectName}-test"
+        },
+        "RetentionInDays": 30
+      }
+    },
+    "SecurityLogGroup": {
+      "Type": "AWS::Logs::LogGroup",
+      "Properties": {
+        "LogGroupName": {
+          "Fn::Sub": "/aws/codebuild/${ProjectName}-security"
+        },
+        "RetentionInDays": 30
+      }
+    },
+    "BuildProject": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-build"
+        },
+        "Description": "Build project for CI/CD pipeline",
+        "ServiceRole": {"Ref": "CodeBuildRole"},
+        "Artifacts": {
+          "Type": "CODEPIPELINE"
+        },
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_MEDIUM",
+          "Image": "aws/codebuild/amazonlinux2-x86_64-standard:5.0",
+          "EnvironmentVariables": [
+            {
+              "Name": "AWS_DEFAULT_REGION",
+              "Value": {"Ref": "AWS::Region"}
+            },
+            {
+              "Name": "AWS_ACCOUNT_ID",
+              "Value": {"Ref": "AWS::AccountId"}
+            },
+            {
+              "Name": "IMAGE_REPO_NAME",
+              "Value": {"Ref": "DockerImageName"}
+            },
+            {
+              "Name": "IMAGE_TAG",
+              "Value": {"Ref": "DockerImageTag"}
+            }
+          ]
+        },
+        "Source": {
+          "Type": "CODEPIPELINE",
+          "BuildSpec": {
+            "Fn::Sub": "version: 0.2\n\nphases:\n  pre_build:\n    commands:\n      - echo Logging in to Amazon ECR...\n      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com\n      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME\n      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)\n      - IMAGE_TAG=${COMMIT_HASH:=latest}\n  build:\n    commands:\n      - echo Build started on `date`\n      - echo Building the Docker image...\n      - docker build -t $IMAGE_REPO_NAME:$IMAGE_TAG .\n      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $REPOSITORY_URI:$IMAGE_TAG\n      - docker tag $IMAGE_REPO_NAME:$IMAGE_TAG $REPOSITORY_URI:latest\n  post_build:\n    commands:\n      - echo Build completed on `date`\n      - echo Pushing the Docker images...\n      - docker push $REPOSITORY_URI:$IMAGE_TAG\n      - docker push $REPOSITORY_URI:latest\n      - echo Writing image definitions file...\n      - printf '[{\"name\":\"${IMAGE_REPO_NAME}\",\"imageUri\":\"%s\"}]' $REPOSITORY_URI:$IMAGE_TAG > imagedefinitions.json\nartifacts:\n  files: imagedefinitions.json"
+          }
+        },
+        "Cache": {
+          "Type": "S3",
+          "Location": {"Ref": "CacheBucket"}
+        }
+      }
+    },
+    "TestProject": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-test"
+        },
+        "Description": "Test project for CI/CD pipeline",
+        "ServiceRole": {"Ref": "CodeBuildRole"},
+        "Artifacts": {
+          "Type": "CODEPIPELINE"
+        },
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_MEDIUM",
+          "Image": "aws/codebuild/amazonlinux2-x86_64-standard:5.0",
+          "EnvironmentVariables": [
+            {
+              "Name": "AWS_DEFAULT_REGION",
+              "Value": {"Ref": "AWS::Region"}
+            }
+          ]
+        },
+        "Source": {
+          "Type": "CODEPIPELINE",
+          "BuildSpec": {
+            "Fn::Sub": "version: 0.2\n\nphases:\n  pre_build:\n    commands:\n      - echo Installing test dependencies...\n      - pip install pytest flake8 bandit\n  build:\n    commands:\n      - echo Running unit tests...\n      - python -m pytest tests/unit/ -v --junitxml=test-results.xml\n      - echo Running linting...\n      - flake8 . --output-file=flake8-results.txt\n      - echo Running security scan...\n      - bandit -r . -f json -o bandit-results.json\n  post_build:\n    commands:\n      - echo Test phase completed on `date`\nartifacts:\n  files:\n    - test-results.xml\n    - flake8-results.txt\n    - bandit-results.json\n  name: test-results-$CODEBUILD_BUILD_ID\nreports:\n  test-report:\n    files:\n      - 'test-results.xml'\n    base-directory: .\n    file-format: JUNITXML"
+          }
+        }
+      }
+    },
+    "SecurityProject": {
+      "Type": "AWS::CodeBuild::Project",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-security"
+        },
+        "Description": "Security scanning project for CI/CD pipeline",
+        "ServiceRole": {"Ref": "CodeBuildRole"},
+        "Artifacts": {
+          "Type": "CODEPIPELINE"
+        },
+        "Environment": {
+          "Type": "LINUX_CONTAINER",
+          "ComputeType": "BUILD_GENERAL1_MEDIUM",
+          "Image": "aws/codebuild/amazonlinux2-x86_64-standard:5.0",
+          "EnvironmentVariables": [
+            {
+              "Name": "AWS_DEFAULT_REGION",
+              "Value": {"Ref": "AWS::Region"}
+            }
+          ]
+        },
+        "Source": {
+          "Type": "CODEPIPELINE",
+          "BuildSpec": {
+            "Fn::Sub": "version: 0.2\n\nphases:\n  pre_build:\n    commands:\n      - echo Installing security scanning tools...\n      - pip install bandit safety semgrep pip-audit\n  build:\n    commands:\n      - echo Security scanning started on `date`\n      - echo Running Bandit security linter...\n      - bandit -r . -f json -o bandit-report.json\n      - echo Running Safety dependency check...\n      - safety check --json --output safety-report.json\n      - echo Running Semgrep static analysis...\n      - semgrep --config=auto --json --output semgrep-report.json .\n      - echo Running pip-audit...\n      - pip-audit --format=json --output pip-audit-report.json\n      - echo Security scanning completed on `date`\n  post_build:\n    commands:\n      - echo Security scan phase completed on `date`\nartifacts:\n  files:\n    - bandit-report.json\n    - safety-report.json\n    - semgrep-report.json\n    - pip-audit-report.json\n  name: security-reports-$CODEBUILD_BUILD_ID\nreports:\n  security-report:\n    files:\n      - 'bandit-report.json'\n      - 'safety-report.json'\n      - 'semgrep-report.json'\n      - 'pip-audit-report.json'\n    base-directory: .\n    file-format: JSON"
+          }
+        }
+      }
+    },
+    "CodeDeployApplication": {
+      "Type": "AWS::CodeDeploy::Application",
+      "Properties": {
+        "ApplicationName": {
+          "Fn::Sub": "${ProjectName}-app"
+        },
+        "ComputePlatform": "ECS"
+      }
+    },
+    "CodeDeployDeploymentGroup": {
+      "Type": "AWS::CodeDeploy::DeploymentGroup",
+      "Properties": {
+        "ApplicationName": {"Ref": "CodeDeployApplication"},
+        "DeploymentGroupName": {
+          "Fn::Sub": "${ProjectName}-deployment-group"
+        },
+        "ServiceRoleArn": {"Ref": "CodeDeployRole"},
+        "DeploymentConfigName": "CodeDeployDefault.ECSAllAtOnce",
+        "AutoRollbackConfiguration": {
+          "Enabled": true,
+          "Events": ["DEPLOYMENT_FAILURE", "DEPLOYMENT_STOP_ON_ALARM", "DEPLOYMENT_STOP_ON_REQUEST"]
+        }
+      }
+    },
+    "CodePipeline": {
+      "Type": "AWS::CodePipeline::Pipeline",
+      "Properties": {
+        "Name": {
+          "Fn::Sub": "${ProjectName}-pipeline"
+        },
+        "RoleArn": {"Ref": "CodePipelineRole"},
+        "ArtifactStore": {
+          "Type": "S3",
+          "Location": {"Ref": "ArtifactsBucket"}
+        },
+        "Stages": [
+          {
+            "Name": "Source",
+            "Actions": [
+              {
+                "Name": "SourceAction",
+                "ActionTypeId": {
+                  "Category": "Source",
+                  "Owner": "AWS",
+                  "Provider": "S3",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "S3Bucket": {"Ref": "ArtifactsBucket"},
+                  "S3ObjectKey": "source.zip"
+                },
+                "OutputArtifacts": [
+                  {
+                    "Name": "SourceOutput"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Name": "Build",
+            "Actions": [
+              {
+                "Name": "BuildAction",
+                "ActionTypeId": {
+                  "Category": "Build",
+                  "Owner": "AWS",
+                  "Provider": "CodeBuild",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "ProjectName": {"Ref": "BuildProject"}
+                },
+                "InputArtifacts": [
+                  {
+                    "Name": "SourceOutput"
+                  }
+                ],
+                "OutputArtifacts": [
+                  {
+                    "Name": "BuildOutput"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Name": "Test",
+            "Actions": [
+              {
+                "Name": "TestAction",
+                "ActionTypeId": {
+                  "Category": "Test",
+                  "Owner": "AWS",
+                  "Provider": "CodeBuild",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "ProjectName": {"Ref": "TestProject"}
+                },
+                "InputArtifacts": [
+                  {
+                    "Name": "BuildOutput"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Name": "Security",
+            "Actions": [
+              {
+                "Name": "SecurityAction",
+                "ActionTypeId": {
+                  "Category": "Test",
+                  "Owner": "AWS",
+                  "Provider": "CodeBuild",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "ProjectName": {"Ref": "SecurityProject"}
+                },
+                "InputArtifacts": [
+                  {
+                    "Name": "SourceOutput"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Name": "Deploy",
+            "Actions": [
+              {
+                "Name": "DeployAction",
+                "ActionTypeId": {
+                  "Category": "Deploy",
+                  "Owner": "AWS",
+                  "Provider": "CodeDeploy",
+                  "Version": "1"
+                },
+                "Configuration": {
+                  "ApplicationName": {"Ref": "CodeDeployApplication"},
+                  "DeploymentGroupName": {"Ref": "CodeDeployDeploymentGroup"}
+                },
+                "InputArtifacts": [
+                  {
+                    "Name": "BuildOutput"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "NotificationTopic": {
+      "Type": "AWS::SNS::Topic",
+      "Properties": {
+        "TopicName": {
+          "Fn::Sub": "${ProjectName}-notifications"
+        },
+        "DisplayName": {
+          "Fn::Sub": "${ProjectName} CI/CD Notifications"
+        }
+      }
+    },
+    "NotificationSubscription": {
+      "Type": "AWS::SNS::Subscription",
+      "Condition": "IsProduction",
+      "Properties": {
+        "Protocol": "email",
+        "TopicArn": {"Ref": "NotificationTopic"},
+        "Endpoint": {"Ref": "NotificationEmail"}
+      }
+    },
+    "PipelineFailureAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${ProjectName}-pipeline-failures"
+        },
+        "AlarmDescription": "Pipeline execution failures",
+        "MetricName": "FailedExecutions",
+        "Namespace": "AWS/CodePipeline",
+        "Statistic": "Sum",
+        "Dimensions": [
+          {
+            "Name": "PipelineName",
+            "Value": {"Ref": "CodePipeline"}
+          }
+        ],
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "AlarmActions": [{"Ref": "NotificationTopic"}]
+      }
+    },
+    "BuildFailureAlarm": {
+      "Type": "AWS::CloudWatch::Alarm",
+      "Properties": {
+        "AlarmName": {
+          "Fn::Sub": "${ProjectName}-build-failures"
+        },
+        "AlarmDescription": "Build project failures",
+        "MetricName": "FailedBuilds",
+        "Namespace": "AWS/CodeBuild",
+        "Statistic": "Sum",
+        "Dimensions": [
+          {
+            "Name": "ProjectName",
+            "Value": {"Ref": "BuildProject"}
+          }
+        ],
+        "Period": 300,
+        "EvaluationPeriods": 1,
+        "Threshold": 0,
+        "ComparisonOperator": "GreaterThanThreshold",
+        "AlarmActions": [{"Ref": "NotificationTopic"}]
+      }
+    }
+  },
+  "Outputs": {
+    "ArtifactsBucketName": {
+      "Description": "Name of the S3 bucket for artifacts",
+      "Value": {"Ref": "ArtifactsBucket"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ArtifactsBucket"
+        }
+      }
+    },
+    "ArtifactsBucketArn": {
+      "Description": "ARN of the S3 bucket for artifacts",
+      "Value": {"Fn::GetAtt": ["ArtifactsBucket", "Arn"]},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-ArtifactsBucketArn"
+        }
+      }
+    },
+    "CodePipelineName": {
+      "Description": "Name of the CodePipeline",
+      "Value": {"Ref": "CodePipeline"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-CodePipeline"
+        }
+      }
+    },
+    "CodePipelineArn": {
+      "Description": "ARN of the CodePipeline",
+      "Value": {"Fn::GetAtt": ["CodePipeline", "Arn"]},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-CodePipelineArn"
+        }
+      }
+    },
+    "BuildProjectName": {
+      "Description": "Name of the CodeBuild project for building",
+      "Value": {"Ref": "BuildProject"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-BuildProject"
+        }
+      }
+    },
+    "TestProjectName": {
+      "Description": "Name of the CodeBuild project for testing",
+      "Value": {"Ref": "TestProject"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-TestProject"
+        }
+      }
+    },
+    "SecurityProjectName": {
+      "Description": "Name of the CodeBuild project for security scanning",
+      "Value": {"Ref": "SecurityProject"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-SecurityProject"
+        }
+      }
+    },
+    "CodeDeployApplicationName": {
+      "Description": "Name of the CodeDeploy application",
+      "Value": {"Ref": "CodeDeployApplication"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-CodeDeployApplication"
+        }
+      }
+    },
+    "NotificationTopicArn": {
+      "Description": "ARN of the SNS topic for notifications",
+      "Value": {"Ref": "NotificationTopic"},
+      "Export": {
+        "Name": {
+          "Fn::Sub": "${AWS::StackName}-NotificationTopic"
+        }
+      }
+    }
+  }
+}

@@ -8,11 +8,11 @@ This project provides a complete CI/CD and DevOps solution including:
 
 - **CodePipeline Automation** - Multi-stage software delivery pipelines
 - **Build Automation** - Automated build and testing processes
-- **Deployment Strategies** - Blue-green, canary, and rolling deployments
-- **Infrastructure Testing** - Automated infrastructure validation
+- **Deployment Management** - CodeDeploy integration and automation
+- **Testing Framework** - Unit, integration, security, and performance testing
 - **Security Scanning** - Code and container security scanning
 - **Monitoring & Alerting** - Deployment monitoring and rollback automation
-- **DevOps Tools Integration** - Integration with popular DevOps tools
+- **Infrastructure as Code** - Terraform and CloudFormation implementations
 
 ## 🏗️ Architecture
 
@@ -56,69 +56,33 @@ AWS CI/CD & DevOps Platform
 ```
 aws-cicd-devops/
 ├── README.md                           # This documentation
-├── python/                             # Python automation scripts
-│   ├── pipeline_management/            # Pipeline automation
-│   │   ├── pipeline_manager.py        # Pipeline management
-│   │   ├── build_automation.py        # Build automation
-│   │   └── deployment_manager.py      # Deployment automation
-│   ├── testing/                        # Testing automation
-│   │   ├── unit_testing.py            # Unit test automation
-│   │   ├── integration_testing.py     # Integration test automation
-│   │   └── performance_testing.py     # Performance test automation
-│   ├── security/                       # Security automation
-│   │   ├── code_scanner.py            # Code security scanning
-│   │   ├── container_scanner.py       # Container security scanning
-│   │   └── compliance_checker.py      # Compliance validation
-│   ├── monitoring/                     # Monitoring automation
-│   │   ├── deployment_monitor.py      # Deployment monitoring
-│   │   ├── rollback_manager.py        # Rollback automation
-│   │   └── alerting_manager.py        # Alerting automation
-│   └── utils/                         # Utility functions
-│       ├── git_wrapper.py             # Git operations
-│       ├── docker_wrapper.py          # Docker operations
-│       └── aws_wrapper.py             # AWS operations
+├── requirements.txt                    # Python dependencies
 ├── terraform/                          # Terraform infrastructure
 │   ├── main.tf                        # Main Terraform configuration
 │   ├── variables.tf                   # Terraform variables
-│   ├── outputs.tf                     # Terraform outputs
-│   ├── modules/                       # Terraform modules
-│   │   ├── codepipeline/              # CodePipeline module
-│   │   ├── codebuild/                 # CodeBuild module
-│   │   ├── codedeploy/                # CodeDeploy module
-│   │   ├── monitoring/                # Monitoring module
-│   │   └── security/                  # Security module
-│   └── examples/                      # Example configurations
-├── cloudformation/                    # CloudFormation templates
-│   ├── cicd-platform.yaml             # Main CI/CD platform
-│   ├── codepipeline.yaml              # CodePipeline setup
-│   ├── codebuild.yaml                 # CodeBuild configuration
-│   └── codedeploy.yaml                # CodeDeploy configuration
-├── buildspecs/                        # CodeBuild buildspec files
+│   └── outputs.tf                     # Terraform outputs
+├── cloudformation/                     # CloudFormation templates
+│   ├── cicd-platform.json             # Complete CI/CD platform (JSON)
+│   └── cicd-platform.yaml             # Complete CI/CD platform (YAML)
+├── python/                             # Python automation scripts
+│   ├── pipeline_management/            # Pipeline management
+│   │   ├── pipeline_manager.py        # CodePipeline automation
+│   │   ├── build_automation.py        # CodeBuild automation
+│   │   └── deployment_manager.py      # CodeDeploy automation
+│   ├── testing/                        # Testing automation
+│   │   └── test_manager.py            # Test execution and management
+│   ├── security/                       # Security automation
+│   │   └── security_manager.py        # Security scanning and compliance
+│   └── monitoring/                     # Monitoring and alerting
+│       └── monitoring_manager.py      # Monitoring and alerting automation
+├── buildspecs/                         # CodeBuild buildspec files
 │   ├── buildspec.yml                  # Main buildspec
 │   ├── test-buildspec.yml             # Testing buildspec
 │   ├── security-buildspec.yml         # Security scanning buildspec
-│   └── deploy-buildspec.yml           # Deployment buildspec
-├── appspecs/                          # CodeDeploy appspec files
-│   ├── appspec.yml                    # Main appspec
-│   ├── appspec-ecs.yml                # ECS appspec
-│   ├── appspec-lambda.yml             # Lambda appspec
-│   └── appspec-ec2.yml                # EC2 appspec
-├── scripts/                           # Deployment and utility scripts
-│   ├── deploy_cicd.sh                 # Deploy CI/CD platform
-│   ├── setup_pipeline.sh              # Setup pipeline
-│   ├── run_tests.sh                   # Run tests
-│   └── deploy_application.sh          # Deploy application
-├── config/                            # Configuration files
-│   ├── cicd_config.yaml               # CI/CD configuration
-│   ├── pipeline_config.yaml           # Pipeline configuration
-│   ├── security_config.yaml           # Security configuration
-│   └── monitoring_config.yaml         # Monitoring configuration
-├── templates/                         # Template files
-│   ├── pipeline_templates/            # Pipeline templates
-│   ├── build_templates/               # Build templates
-│   ├── deploy_templates/              # Deployment templates
-│   └── test_templates/                # Test templates
-└── requirements.txt                   # Python dependencies
+│   └── performance-buildspec.yml      # Performance testing buildspec
+└── scripts/                            # Deployment and utility scripts
+    ├── deploy_cicd.sh                 # Deploy CI/CD platform
+    └── run_tests.sh                   # Run comprehensive tests
 ```
 
 ## 🚀 Quick Start

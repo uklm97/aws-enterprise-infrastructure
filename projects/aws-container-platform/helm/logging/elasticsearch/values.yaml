@@ -1,0 +1,344 @@
+# Elasticsearch Logging Stack Configuration
+# This file contains the default values for the Elasticsearch logging stack
+
+# Enable/disable Elasticsearch
+elasticsearch:
+  enabled: true
+  
+  # Elasticsearch configuration
+  replicas: 3
+  minimumMasterNodes: 2
+  
+  # Image configuration
+  image:
+    repository: "docker.elastic.co/elasticsearch/elasticsearch"
+    tag: "8.8.0"
+    pullPolicy: "IfNotPresent"
+  
+  # Resource configuration
+  resources:
+    requests:
+      cpu: "1000m"
+      memory: "2Gi"
+    limits:
+      cpu: "2000m"
+      memory: "4Gi"
+  
+  # Storage configuration
+  volumeClaimTemplate:
+    accessModes: ["ReadWriteOnce"]
+    storageClassName: "gp2"
+    resources:
+      requests:
+        storage: "50Gi"
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 9200
+    targetPort: 9200
+  
+  # Security configuration
+  secret:
+    enabled: true
+    data:
+      elastic: "changeme"
+  
+  # Environment variables
+  env:
+    - name: "discovery.type"
+      value: "single-node"
+    - name: "xpack.security.enabled"
+      value: "false"
+    - name: "xpack.security.http.ssl.enabled"
+      value: "false"
+    - name: "xpack.security.transport.ssl.enabled"
+      value: "false"
+    - name: "ES_JAVA_OPTS"
+      value: "-Xms1g -Xmx1g"
+  
+  # Node configuration
+  nodeGroup: "master"
+  roles:
+    master: "true"
+    data: "true"
+    ingest: "true"
+  
+  # Anti-affinity configuration
+  antiAffinity: "soft"
+  
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /_cluster/health
+      port: 9200
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /_cluster/health
+      port: 9200
+    initialDelaySeconds: 30
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+  
+  # Ingress configuration
+  ingress:
+    enabled: false
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: elasticsearch.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  
+  # Monitoring configuration
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
+      scrapeTimeout: 10s
+      labels: {}
+      annotations: {}
+  
+  # Logging configuration
+  log4j2:
+    appenders:
+      console:
+        type: console
+        layout:
+          type: pattern
+          pattern: "%d{ISO8601} [%t] %-5p %c{1} - %m%n"
+      file:
+        type: rolling_file
+        file_name: /usr/share/elasticsearch/logs/elasticsearch.log
+        layout:
+          type: pattern
+          pattern: "%d{ISO8601} [%t] %-5p %c{1} - %m%n"
+        policies:
+          size:
+            size: "100MB"
+          time:
+            interval: 1
+            modulate: true
+    loggers:
+      - name: org.elasticsearch
+        level: info
+      - name: org.elasticsearch.deprecation
+        level: warn
+      - name: org.elasticsearch.discovery
+        level: info
+      - name: org.elasticsearch.index
+        level: info
+      - name: org.elasticsearch.indices
+        level: info
+      - name: org.elasticsearch.search
+        level: info
+      - name: org.elasticsearch.transport
+        level: info
+    rootLogger:
+      level: info
+      appenderRef:
+        - ref: console
+        - ref: file
+
+# Kibana configuration
+kibana:
+  enabled: true
+  
+  # Image configuration
+  image:
+    repository: "docker.elastic.co/kibana/kibana"
+    tag: "8.8.0"
+    pullPolicy: "IfNotPresent"
+  
+  # Resource configuration
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  
+  # Service configuration
+  service:
+    type: LoadBalancer
+    port: 5601
+    targetPort: 5601
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: nlb
+      service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+  
+  # Environment variables
+  env:
+    - name: "ELASTICSEARCH_HOSTS"
+      value: "http://elasticsearch-master:9200"
+    - name: "SERVER_HOST"
+      value: "0.0.0.0"
+    - name: "SERVER_PORT"
+      value: "5601"
+  
+  # Ingress configuration
+  ingress:
+    enabled: false
+    className: "nginx"
+    annotations:
+      nginx.ingress.kubernetes.io/rewrite-target: /
+    hosts:
+      - host: kibana.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls: []
+  
+  # Monitoring configuration
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
+      scrapeTimeout: 10s
+      labels: {}
+      annotations: {}
+
+# Fluentd configuration
+fluentd:
+  enabled: true
+  
+  # Image configuration
+  image:
+    repository: "fluent/fluentd-kubernetes-daemonset"
+    tag: "v1-debian-elasticsearch"
+    pullPolicy: "IfNotPresent"
+  
+  # Resource configuration
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+  
+  # Configuration
+  config:
+    elasticsearch:
+      host: "elasticsearch-master"
+      port: 9200
+      index_name: "kubernetes-logs"
+      type_name: "fluentd"
+      logstash_format: true
+      logstash_prefix: "kubernetes"
+      logstash_dateformat: "%Y%m%d"
+      include_tag_key: true
+      tag_key: "@log_name"
+      flush_interval: "5s"
+      max_retry_wait: "30s"
+      disable_retry_limit: false
+      reload_connections: false
+      reload_on_failure: true
+      resurrect_after: "60s"
+      reconnect_on_error: true
+      reload_connections: false
+      buffer_type: "file"
+      buffer_path: "/var/log/fluentd-buffers/kubernetes.system.buffer"
+      buffer_queue_limit: "8"
+      buffer_chunk_limit: "2m"
+      buffer_queue_full_action: "block"
+      retry_max_interval: "30s"
+      retry_forever: true
+      max_retry_wait: "30s"
+      disable_retry_limit: false
+      reload_connections: false
+      reload_on_failure: true
+      resurrect_after: "60s"
+      reconnect_on_error: true
+      reload_connections: false
+      buffer_type: "file"
+      buffer_path: "/var/log/fluentd-buffers/kubernetes.system.buffer"
+      buffer_queue_limit: "8"
+      buffer_chunk_limit: "2m"
+      buffer_queue_full_action: "block"
+      retry_max_interval: "30s"
+      retry_forever: true
+  
+  # DaemonSet configuration
+  daemonset:
+    enabled: true
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 24224
+    targetPort: 24224
+  
+  # Monitoring configuration
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
+      scrapeTimeout: 10s
+      labels: {}
+      annotations: {}
+
+# Logstash configuration (optional)
+logstash:
+  enabled: false
+  
+  # Image configuration
+  image:
+    repository: "docker.elastic.co/logstash/logstash"
+    tag: "8.8.0"
+    pullPolicy: "IfNotPresent"
+  
+  # Resource configuration
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "1000m"
+      memory: "2Gi"
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 5044
+    targetPort: 5044
+  
+  # Configuration
+  config:
+    input:
+      beats:
+        port: 5044
+    filter:
+      if [fields][service] == "kubernetes" {
+        mutate {
+          add_field => { "log_type" => "kubernetes" }
+        }
+      }
+    output:
+      elasticsearch:
+        hosts: ["elasticsearch-master:9200"]
+        index: "logstash-%{+YYYY.MM.dd}"
