@@ -105,16 +105,22 @@ EOF
 check_prerequisites() {
     print_status "Checking prerequisites..."
     
-    # Check AWS CLI
-    if ! command -v aws &> /dev/null; then
-        print_error "AWS CLI is not installed. Please install it first."
-        exit 1
-    fi
-    
-    # Check AWS credentials
-    if ! aws sts get-caller-identity &> /dev/null; then
-        print_error "AWS credentials not configured. Please run 'aws configure' first."
-        exit 1
+    # Check AWS CLI for Terraform or 'both' implementations. For Python-only
+    # runs this is optional to allow offline execution.
+    if [[ "$IMPLEMENTATION" == "terraform" || "$IMPLEMENTATION" == "both" ]]; then
+        if ! command -v aws &> /dev/null; then
+            print_error "AWS CLI is not installed. Please install it first."
+            exit 1
+        fi
+        # Check AWS credentials
+        if ! aws sts get-caller-identity &> /dev/null; then
+            print_error "AWS credentials not configured. Please run 'aws configure' first."
+            exit 1
+        fi
+    else
+        if ! command -v aws &> /dev/null; then
+            print_warning "AWS CLI not found. Continuing without AWS CLI for Python implementation."
+        fi
     fi
     
     # Check Python (for Python implementation)
@@ -165,10 +171,12 @@ validate_config() {
     fi
     
     if [[ -n "$REGION" ]]; then
-        # Validate AWS region
-        if ! aws ec2 describe-regions --region "$REGION" &> /dev/null; then
-            print_error "Invalid AWS region: $REGION"
-            exit 1
+        # Validate AWS region (skip if AWS CLI not required)
+        if [[ "$IMPLEMENTATION" == "terraform" || "$IMPLEMENTATION" == "both" ]]; then
+            if ! aws ec2 describe-regions --region "$REGION" &> /dev/null; then
+                print_error "Invalid AWS region: $REGION"
+                exit 1
+            fi
         fi
     fi
     
@@ -184,7 +192,9 @@ run_python_audit() {
     # Install dependencies if requirements.txt exists
     if [[ -f "requirements.txt" ]]; then
         print_status "Installing Python dependencies..."
-        pip3 install -r requirements.txt
+        if ! pip3 install -r requirements.txt; then
+            print_warning "Dependency installation failed; continuing with optional features disabled."
+        fi
     fi
     
     # Build command
